@@ -1,0 +1,343 @@
+classDiagram
+
+    %% ══════════════════════════════════════
+    %% INTERFACES
+    %% ══════════════════════════════════════
+
+    class Multimodal {
+        <<interface>>
+        +List~String~ input_modalities
+        +String output_modality
+    }
+
+    class Agentic {
+        <<interface>>
+        +List~Tool~ tools
+        +String memory_type
+        +int max_iterations
+    }
+
+    %% ══════════════════════════════════════
+    %% ROOT
+    %% ══════════════════════════════════════
+
+    class NLPTask {
+        <<abstract>>
+        +String model_name
+        +String language
+        +bool multilingual
+        +List~String~ supported_languages
+        +String domain
+        +int max_seq_len
+    }
+
+    %% ══════════════════════════════════════
+    %% THEMATIC BRANCHES
+    %% ══════════════════════════════════════
+
+    class NLPDiscriminativeTask {
+        <<abstract>>
+    }
+
+    class NLPGenerativeTask {
+        <<abstract>>
+        +DecoderStrategy decoder_strategy
+        +int max_new_tokens
+    }
+
+    class NLPRepresentationTask {
+        <<abstract>>
+    }
+
+    class AudioTask {
+        <<abstract>>
+        +int sample_rate
+        +AudioFormat audio_format
+        +float duration_sec
+        +int n_channels
+    }
+
+    class VisionLanguageTask {
+        <<abstract>>
+    }
+
+    NLPTask <|-- NLPDiscriminativeTask
+    NLPTask <|-- NLPGenerativeTask
+    NLPTask <|-- NLPRepresentationTask
+    NLPTask <|-- AudioTask
+    NLPTask <|-- VisionLanguageTask
+    Multimodal <|.. AudioTask
+    Multimodal <|.. VisionLanguageTask
+
+    %% ══════════════════════════════════════
+    %% DISCRIMINATIVE — SEQUENCE CLASSIFICATION
+    %% ══════════════════════════════════════
+
+    class SequenceClassificationTask {
+        <<abstract>>
+        +int num_classes
+        +LabelScheme label_scheme
+        +List~String~ class_names
+        +bool predict_proba
+    }
+
+    class SentimentAnalysisTask {
+        +Granularity granularity
+        +bool aspect_based
+    }
+
+    class IntentDetectionTask {
+        +List~String~ intent_taxonomy
+        +float oos_threshold
+    }
+
+    class NLITask {
+        +String premise_field
+        +String hypothesis_field
+        +bool multi_genre
+    }
+
+    class DocumentClassificationTask {
+        +int max_doc_length
+        +String chunking_strategy
+    }
+
+    class LanguageDetectionTask {
+        +int top_k_langs
+        +float confidence_threshold
+    }
+
+    NLPDiscriminativeTask <|-- SequenceClassificationTask
+    SequenceClassificationTask <|-- SentimentAnalysisTask
+    SequenceClassificationTask <|-- IntentDetectionTask
+    SequenceClassificationTask <|-- NLITask
+    SequenceClassificationTask <|-- DocumentClassificationTask
+    SequenceClassificationTask <|-- LanguageDetectionTask
+
+    %% ══════════════════════════════════════
+    %% DISCRIMINATIVE — TOKEN CLASSIFICATION
+    %% ══════════════════════════════════════
+
+    class TokenClassificationTask {
+        <<abstract>>
+        +TagScheme tag_scheme
+        +List~String~ entity_types
+        +bool align_subwords
+        +bool nested_entities
+    }
+
+    class NERTask {
+        +bool link_to_kb
+    }
+
+    class POSTaggingTask {
+        +String tagset
+    }
+
+    NLPDiscriminativeTask <|-- TokenClassificationTask
+    TokenClassificationTask <|-- NERTask
+    TokenClassificationTask <|-- POSTaggingTask
+
+    %% ══════════════════════════════════════
+    %% DISCRIMINATIVE — QA & SPAN EXTRACTION
+    %% ══════════════════════════════════════
+
+    class QATask {
+        <<abstract>>
+        +bool context_provided
+        +QAOutputType output_type
+    }
+
+    class ExtractiveQATask {
+        +String context_type
+        +bool is_rule_based
+    }
+
+    class FillMaskTask {
+        +String masked_input
+        +int top_k
+        +String mask_token
+    }
+
+    NLPDiscriminativeTask <|-- QATask
+    QATask <|-- ExtractiveQATask
+    NLPDiscriminativeTask <|-- FillMaskTask
+
+    %% ══════════════════════════════════════
+    %% GENERATIVE — COMPLETION
+    %% ══════════════════════════════════════
+
+    class CompletionTask {
+        +String prompt
+        +String system_prompt
+        +int max_tokens
+        +String prompt_format
+    }
+
+    class CodeGenerationTask {
+        +String programming_language
+        +String task_type
+        +bool with_tests
+    }
+
+    class DialogueTask {
+        +List~Message~ conversation_history
+        +String persona
+    }
+
+    NLPGenerativeTask <|-- CompletionTask
+    CompletionTask <|-- CodeGenerationTask
+    CompletionTask <|-- DialogueTask
+
+    %% ══════════════════════════════════════
+    %% GENERATIVE — SEQ2SEQ
+    %% ══════════════════════════════════════
+
+    class Seq2SeqTask {
+        <<abstract>>
+    }
+
+    class MachineTranslationTask {
+        +String src_lang
+        +String tgt_lang
+        +bool preserve_formatting
+    }
+
+    class SummarizationTask {
+        +SumStyle style
+        +int target_length
+    }
+
+    class TextStyleTransferTask {
+        +String source_style
+        +String target_style
+    }
+
+    NLPGenerativeTask <|-- Seq2SeqTask
+    Seq2SeqTask <|-- MachineTranslationTask
+    Seq2SeqTask <|-- SummarizationTask
+    Seq2SeqTask <|-- TextStyleTransferTask
+
+    %% ══════════════════════════════════════
+    %% GENERATIVE — AGENTIC / RAG
+    %% ══════════════════════════════════════
+
+    class RagTask {
+        +int top_k_docs
+        +RetrieverType retriever_type
+    }
+
+    class AgentTask {
+        +String agent_type
+        +String planning_strategy
+    }
+
+    NLPGenerativeTask <|-- RagTask
+    NLPGenerativeTask <|-- AgentTask
+    Agentic <|.. RagTask
+    Agentic <|.. AgentTask
+    RagTask o-- EmbeddingTask
+    RagTask o-- CompletionTask
+
+    %% ══════════════════════════════════════
+    %% REPRESENTATION
+    %% ══════════════════════════════════════
+
+    class EmbeddingTask {
+        +int embedding_dim
+        +PoolingStrategy pooling
+        +bool normalize
+        +TrainingParadigm training_paradigm
+    }
+
+    class SentenceSimilarityTask {
+        +SimilarityMetric metric
+    }
+
+    class RankingTask {
+        +String ranking_strategy
+        +List~String~ candidates
+    }
+
+    class TopicModelingTask {
+        +int n_topics
+        +String algorithm
+    }
+
+    class ClusteringNLPTask {
+        +int n_clusters
+        +String algorithm
+        +String distance_metric
+    }
+
+    NLPRepresentationTask <|-- EmbeddingTask
+    NLPRepresentationTask <|-- SentenceSimilarityTask
+    NLPRepresentationTask <|-- RankingTask
+    NLPRepresentationTask <|-- TopicModelingTask
+    NLPRepresentationTask <|-- ClusteringNLPTask
+
+    %% ══════════════════════════════════════
+    %% AUDIO
+    %% ══════════════════════════════════════
+
+    class ASRTask {
+        +float wer_target
+        +bool with_punctuation
+        +bool with_diarization
+    }
+
+    class TTSTask {
+        +String voice_id
+        +ProsodyConfig prosody_config
+        +Vocoder vocoder
+    }
+
+    class AudioToAudioTask {
+        +String conversion_type
+    }
+
+    class AudioProcessingTask {
+        <<abstract>>
+    }
+
+    class SpeakerDiarizationTask {
+        +int max_speakers
+        +bool with_timestamps
+    }
+
+    class AudioEnhancementTask {
+        +List~String~ noise_types
+        +float target_snr
+    }
+
+    AudioTask <|-- ASRTask
+    AudioTask <|-- TTSTask
+    AudioTask <|-- AudioToAudioTask
+    AudioTask <|-- AudioProcessingTask
+    AudioProcessingTask <|-- SpeakerDiarizationTask
+    AudioProcessingTask <|-- AudioEnhancementTask
+
+    %% ══════════════════════════════════════
+    %% VISION × LANGUAGE
+    %% ══════════════════════════════════════
+
+    class OCRTask {
+        +String layout_mode
+        +bool detect_tables
+    }
+
+    class ImageCaptioningTask {
+        +int max_caption_len
+        +String caption_style
+    }
+
+    class VisualQATask {
+        +String question
+        +String image_input
+        +QAOutputType output_type
+    }
+
+    VisionLanguageTask <|-- OCRTask
+    VisionLanguageTask <|-- ImageCaptioningTask
+    VisionLanguageTask <|-- VisualQATask
+    QATask <|-- VisualQATask

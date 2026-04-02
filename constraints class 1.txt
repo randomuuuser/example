@@ -1,0 +1,254 @@
+Each analyser carries hard constraints (validation errors that block rendering) and soft constraints (warnings). Constraints are checked at analyser.validate(task) time before any chart or metric is computed. The applies_to field defines the compatible task types — checked statically.
+
+Quality Metrics
+METRIC
+BLEUScoreAnalyser
+n-gram
++
+int
+max_ngram
+default 4
++
+bool
+smoothing
+Applies to
+Seq2SeqTaskCompletionGenerative
+Constraints
+[HARD] reference_translations must not be empty
+[HARD] hypothesis length ≥ 1 token
+[SOFT] warn if corpus < 100 sentences (score unstable)
+ROUGEAnalyser
+overlap
++
+List[str]
+variants
+ROUGE-1 · ROUGE-L · ROUGE-S
+Applies to
+SummarizationTaskSeq2SeqTask
+Constraints
+[HARD] reference_summary must exist
+[SOFT] warn if summary_length < 10 tokens
+WERAnalyser
+ASR-specific
++
+bool
+compute_cer
+character error rate
++
+bool
+case_sensitive
++
+bool
+normalize_punctuation
+Applies to
+ASRTask
+Constraints
+[HARD] ground_truth_transcription must be set
+[HARD] task.language must match reference language
+BERTScoreAnalyser
+semantic
++
+str
+ref_model
++
+int
+layer
+Applies to
+NLPTask
+Constraints
+[HARD] ref_model language must match task.language
+[SOFT] warn if batch_size > 512 (memory)
+Score-Based Charts
+CHART
+← Constraints are critical here
+RadarChartAnalyser
+radar / spider
++
+Dict[str,float]
+dimension_scores
+fluency, relevance, coherence…
++
+bool
+normalize_0_1
+Applies to
+InstructionFollowingTaskRAGTaskTextGenerationTask
+Constraints
+[HARD] len(dimension_scores) ≥ 3 — radar requires ≥ 3 axes to form a surface
+[HARD] all scores must be in the same range (0–1 or 0–5), not mixed
+[HARD] no NaN/None values in dimension_scores
+[SOFT] warn if len(dimension_scores) > 10 (chart unreadable)
+[SOFT] warn if any score = 0 (may indicate missing evaluation)
+BarChartScoreAnalyser
+bar
++
+Dict[str,float]
+scores
++
+bool
+show_baseline
++
+float
+baseline_value
+Applies to
+NLPTask
+Constraints
+[HARD] len(scores) ≥ 1
+[HARD] if show_baseline → baseline_value must be set
+[SOFT] warn if len(scores) > 20 (legibility)
+ConfusionMatrixAnalyser
+matrix
++
+bool
+normalize
+by row / col / total
+Applies to
+SequenceClassificationTaskTokenClassificationTask
+Constraints
+[HARD] num_classes ≥ 2
+[HARD] predictions and ground truth must have the same length
+[SOFT] warn if num_classes > 30 (matrix unreadable, suggest top-k)
+ScoreDistributionAnalyser
+histogram
++
+int
+n_bins
++
+bool
+show_kde
+Applies to
+TextToNumericalTaskSentenceSimilarityTask
+Constraints
+[HARD] n_samples ≥ 10 (histogram meaningless otherwise)
+[SOFT] warn if scores are binary-clustered (bimodal)
+Behavioral Analysis
+BEHAVIORAL
+HallucinationRateAnalyser
++
+str
+detection_method
+NLI · SelfCheck · LLM-judge
++
+float
+threshold
+Applies to
+CompletionGenerativeTaskRAGTaskGenerativeQATask
+Constraints
+[HARD] reference_facts must not be empty when method = NLI
+[SOFT] warn if n_samples < 30 (rate unreliable)
+BiasAnalyser
++
+List[str]
+protected_attributes
++
+str
+bias_metric
+WEAT · demographic_parity · equalized_odds
+Applies to
+NLPTask
+Constraints
+[HARD] len(protected_attributes) ≥ 1
+[SOFT] warn if attribute groups are highly imbalanced (>10:1)
+ToxicityAnalyser
++
+List[str]
+categories
+hate · threat · obscene…
++
+str
+classifier_model
+Applies to
+CompletionGenerativeTaskNLPTask
+Constraints
+[HARD] output must be text, not numerical
+Explainability / XAI
+XAI
+AttentionMapAnalyser
++
+List[int]
+heads
++
+int
+layer
++
+str
+aggregation
+mean · max · rollout
+Applies to
+NLPTask
+Constraints
+[HARD] model must expose attention weights (transformer-based)
+[HARD] layer index must be within model depth
+TokenAttributionAnalyser
++
+str
+method
+SHAP · LIME · IntegratedGradients
++
+int
+n_samples
+Applies to
+SequenceClassificationTaskTokenClassificationTask
+Constraints
+[HARD] n_samples ≥ 1
+[SOFT] warn if method=SHAP and seq_len > 512 (slow)
+EmbeddingSpaceAnalyser
++
+str
+reduction
+UMAP · t-SNE · PCA
++
+str
+distance_metric
+Applies to
+EmbeddingTaskUnsupervisedEmbeddingTask
+Constraints
+[HARD] n_samples ≥ 2 (can't reduce a single point)
+[SOFT] warn if n_samples < 30 (2D projection meaningless)
+[SOFT] warn if reduction=t-SNE and n_samples > 50k (memory)
+ScoreProxyAnalyser
+meta-eval
+Proxy metric from Observability / XAI in your notes
++
+str
+proxy_type
+output_length · perplexity · confidence
++
+str
+correlation_target
+human score / gold metric
+Applies to
+NLPTask
+Constraints
+[HARD] correlation_target must be defined
+[SOFT] warn if Pearson r² < 0.3 (weak proxy)
+Observability / Latency / Cost
+OBS
+LatencyAnalyser
++
+List[int]
+percentiles
+p50 · p95 · p99
+Applies to
+NLPTask
+Constraints
+[HARD] n_requests ≥ 5 (percentile needs samples)
+TokenThroughputAnalyser
++
+bool
+include_prefill
+Applies to
+CompletionGenerativeTask
+Constraints
+[HARD] model must count output tokens (not all APIs expose this)
+CostPerQueryAnalyser
++
+float
+price_per_1k_tokens
++
+str
+currency
+Applies to
+CompletionGenerativeTaskRAGTask
+Constraints
+[HARD] price_per_1k_tokens > 0
+[SOFT] warn if RAG and retrieval cost not included
