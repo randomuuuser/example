@@ -1,0 +1,50 @@
+Définitions mises à jour
+	∙	QATask — classe abstraite représentant toute tâche de question-réponse, indépendamment du paradigme (extraction de span ou génération libre) ; elle se spécialise selon le mécanisme sous-jacent. Ex : base commune d’un système de QA sur contrats qui peut fonctionner en mode extractif ou génératif selon le modèle déployé.
+	∙	AbstractiveQATask — génère une réponse formulée librement à partir d’un ou plusieurs contextes, sans se limiter à surligner un passage existant. Ex : répondre à “quelles sont mes garanties en cas d’hospitalisation ?” en synthétisant plusieurs clauses d’un contrat d’assurance.
+
+Top 10 use cases assurance
+1. Analyse d’appels entrants — déjà en prod, à enrichir
+ASRTask → SpeakerDiarizationTask → IntentDetectionTask + SentimentAnalysisTask + NERTask
+Transcription de l’appel, séparation conseiller/client, détection de l’intention (résiliation, sinistre, renseignement), extraction d’entités (numéro de police, date de sinistre), scoring émotionnel du client. Le tout alimente un tableau de bord de supervision qualité.
+2. Réponse automatique de mails — déjà en prod, à enrichir
+DocumentClassificationTask → AbstractiveQATask → CompletionTask
+Classification du mail entrant par type de demande (sinistre, résiliation, modification contrat), extraction des informations clés (NERTask), puis génération d’une réponse contextualisée. Ajout d’un score de confiance pour router vers validation humaine en dessous d’un seuil.
+3. Agent RAG conseiller — déjà en prod, à enrichir
+RagTask (EmbeddingTask + CompletionTask) + AgentTask
+Chatbot interne pour les conseillers qui répond sur la base des CGU, circulaires internes, et fiches produits. Extension possible : l’agent appelle des outils (consultation CRM, recherche dans le dossier client) pour des réponses personnalisées.
+4. Triage et routage automatique de documents entrants
+DocumentClassificationTask → NERTask
+Classification automatique des pièces jointes reçues (relevé bancaire, certificat médical, facture de réparation, carte grise) et extraction des métadonnées clés pour pré-remplir le dossier sinistre. Réduit drastiquement la saisie manuelle.
+5. Détection d’anomalies dans les déclarations de sinistre
+NLITask + SentenceSimilarityTask
+Comparer la déclaration textuelle du sinistre avec les clauses du contrat souscrit (NLI : la déclaration est-elle cohérente avec la couverture ?) et détecter les incohérences entre différentes déclarations du même assuré (similarité sémantique).
+6. Résumé automatique de dossiers sinistre
+SummarizationTask
+Condensation de l’historique complet d’un dossier (mails, notes, PV, rapports d’expertise) en un résumé structuré présenté au gestionnaire en début de traitement. Réduit le temps de prise en main d’un dossier complexe.
+7. Veille réglementaire et conformité
+RagTask + NLITask
+Indexation des textes réglementaires (ACPR, DDA, RGPD) et des circulaires internes. L’agent répond aux questions de conformité des équipes juridiques et compliance, et peut vérifier si une pratique décrite est conforme à une réglementation donnée via NLI.
+8. Qualification automatique des leads et réclamations
+IntentDetectionTask + SentimentAnalysisTask + RankingTask
+Sur les formulaires web et chats entrants : détecter l’intention (achat, réclamation, résiliation), scorer l’urgence émotionnelle, et prioriser la file de traitement par les conseillers selon un ranking combiné intention × sentiment × ancienneté client.
+9. Génération de rapports d’expertise assistée
+AbstractiveQATask + CompletionTask
+À partir des photos de sinistre (dégât des eaux, accident auto), des devis, et du contrat, générer un premier jet de rapport d’expertise structuré que l’expert humain n’a plus qu’à valider et corriger. Couplable avec VisualQATask pour l’analyse des photos.
+10. Monitoring qualité des transcriptions ASR en production
+ASRTask + ClusteringNLPTask + EmbeddingTask
+Détection non supervisée des appels mal transcrits sans WER de référence : clustering des embeddings de transcriptions, isolation des clusters atypiques (bruit, accent fort, jargon technique) pour déclencher une révision humaine ciblée ou un fine-tuning.
+
+Analysers proposés
+Voici une proposition structurée par famille, du plus spécifique au plus générique.
+A1 — EmailQualityAnalyzer (pour CompletionTask / réponse mail)
+Évalue la qualité des mails générés automatiquement. Métriques : score de tonalité (SentimentAnalysisTask sur le mail généré), longueur vs cible, taux de couverture des points clés demandés (via NLI : chaque key_point est-il entailed par la réponse ?), lisibilité (Flesch score). Outputs : dashboard avec distribution des scores par template, exemples extrêmes (meilleurs/pires), drift temporel de la qualité.
+B1 — UnsupervisedASRMonitoringAnalyzer (pour ASRTask)
+Monitoring de la qualité ASR sans transcription de référence. Pipeline : embedding des transcriptions (EmbeddingTask) → clustering (ClusteringNLPTask) → isolation des clusters à forte variance interne ou faible densité → score proxy de difficulté (confidence scores du modèle ASR, longueur des silences, ratio OOV). Output : carte des clusters annotée, liste des appels à réviser en priorité, drift du score proxy dans le temps.
+C1 — RAGEvaluationAnalyzer (pour RagTask)
+Évaluation LLM-as-a-Judge du pipeline RAG selon trois axes : faithfulness (la réponse est-elle fondée sur les documents récupérés ?), answer relevance (la réponse répond-elle à la question ?), context precision (les documents récupérés sont-ils pertinents ?). Chaque dimension est scorée par un LLM judge avec prompt structuré et retourne un score + justification. Output : radar chart par dimension, exemples annotés, matrice de corrélation entre les trois scores.
+C2 — LLMJudgeAnalyzer (générique, applicable à CompletionTask, AbstractiveQATask, DialogueTask)
+Analyser générique qui évalue n’importe quelle sortie textuelle selon des critères configurables (cohérence, pertinence, sécurité, ton, respect des consignes). Basé sur un LLM judge avec biais-correction (Rogan-Gladen si double annotation). Output : score par critère, distribution, exemples flaggés, inter-annotator agreement si plusieurs juges.
+D1 — ClassificationPerformanceAnalyzer (générique, applicable à toute SequenceClassificationTask ou TokenClassificationTask)
+Métriques standard (precision, recall, F1 macro/micro, AUC), matrice de confusion, courbe PR par classe, analyse des erreurs par longueur de texte et par domaine. Générique et réutilisable sur IntentDetectionTask, SentimentAnalysisTask, DocumentClassificationTask, NERTask.
+D2 — EmbeddingSpaceAnalyzer (pour EmbeddingTask, SentenceSimilarityTask)
+Visualisation UMAP/t-SNE de l’espace d’embedding, distribution des scores de similarité intra/inter-classe, détection de collapse (tous les vecteurs trop proches) ou de fragmentation. Utile pour monitorer la qualité des embeddings qui alimentent le RAG.​​​​​​​​​​​​​​​​
