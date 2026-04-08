@@ -1,0 +1,339 @@
+# NLP Analysers - Overview
+
+
+## 1. ClassificationAnalyser
+
+**Scope** : any task producing discrete labels on an input.
+
+---
+
+### 1.1 SequenceClassificationAnalyser
+
+Evaluates sequence-level classification (text, sentence, document) over a label set.
+
+**Compatible tasks** : `SequenceClassificationTask`, `NLITask`, `AudioClassificationTask`  
+**Metrics** : accuracy, macro/micro F1, per-label precision/recall, ROC curve  
+**Visualizations** : confusion matrix, probability distribution, per-label F1 bar chart
+
+---
+
+### 1.2 TokenClassificationAnalyser
+
+Evaluates token-by-token classification.
+
+**Compatible tasks** : `TokenClassificationTask`  
+**Metrics** : token-level accuracy, per-label F1  
+**Visualizations** : per-tag confusion matrix, per-label F1 bar chart
+
+---
+
+#### 1.2.1 NERAnalyser
+
+Specialises `TokenClassificationAnalyser` for span-level entity evaluation.
+
+**Compatible tasks** : `NERTask`  
+**Metrics** : span-level F1 per entity type, boundary error analysis  
+**Visualizations** : entity F1 bar chart, segmentation error heatmap
+
+---
+
+#### 1.2.2 POSTaggingAnalyser
+
+Specialises `TokenClassificationAnalyser` for morphosyntactic tag sets.
+
+**Compatible tasks** : `POSTaggingTask`  
+**Metrics** : OOV token accuracy, accuracy by sentence length  
+**Visualizations** : tag distribution, accuracy vs. length curve
+
+---
+
+### 1.3 PredictionDiagnosticAnalyser
+
+Surfaces problematic predictions by inspecting the model's confidence distribution. Applicable to any task that outputs class probabilities. Composes naturally with `SequenceClassificationAnalyser` and `XAITextAnalyser` for deeper follow-up analysis.
+
+**Compatible tasks** : `SequenceClassificationTask`, `NLITask`, `TokenClassificationTask`, `AudioClassificationTask`
+
+---
+
+#### 1.3.1 VeryWrongPredictionAnalyser
+
+Surfaces the top-*k* examples for which the model made a wrong prediction with high confidence.
+
+**Compatible tasks** : `SequenceClassificationTask`, `NLITask`, `TokenClassificationTask`, `AudioClassificationTask`  
+**Metrics** : confidence score of wrong predictions, per-class error rate at high-confidence threshold  
+**Visualizations** : ranked list of wrong examples with predicted label, true label, and confidence score; confidence distribution of errors
+
+> If the underlying model is inherently interpretable (e.g. logistic regression), pairs naturally with `LinearFeatureImportanceAnalyser` to display token-level highlights alongside each wrong example.
+
+---
+
+#### 1.3.2 UnsurePredictionAnalyser
+
+Surfaces the top-*k* examples for which the model is the most uncertain, identified by a near-uniform predicted probability distribution. Ideal candidates for human review or active learning.
+
+**Compatible tasks** : `SequenceClassificationTask`, `NLITask`, `TokenClassificationTask`, `AudioClassificationTask`  
+**Metrics** : prediction entropy, confidence gap between top-2 classes  
+**Visualizations** : ranked list of uncertain examples with full probability distribution; entropy distribution across the dataset
+
+---
+
+## 2. GenerationAnalyser
+
+**Scope** : any task producing free-form text output.
+
+---
+
+### 2.1 Seq2SeqAnalyser
+
+Evaluates generated text quality against one or more references.
+
+**Compatible tasks** : `Seq2SeqTask`, `MachineTranslationTask`, `SummarizationTask`, `DialogueTask`, `AbstractiveQATask`  
+**Metrics** : BLEU, ROUGE-{1,2,L}, METEOR, BERTScore  
+**Visualizations** : score distribution, source vs. target length, n-gram overlap heatmap
+
+---
+
+#### 2.1.1 MachineTranslationAnalyser
+
+Specialises `Seq2SeqAnalyser` for translation quality.
+
+**Compatible tasks** : `MachineTranslationTask`, `SpeechTranslationTask`  
+**Metrics** : chrF, TER, COMET, lexical alignment  
+**Visualizations** : score vs. source length, terminology error analysis
+
+---
+
+#### 2.1.2 SummarizationAnalyser
+
+Specialises `Seq2SeqAnalyser` for summarization quality.
+
+**Compatible tasks** : `SummarizationTask`  
+**Metrics** : compression ratio, extractive density, faithfulness (via NLI)  
+**Visualizations** : length ratio, ROUGE vs. compression curve
+
+---
+
+#### 2.1.3 DialogueAnalyser
+
+Specialises `Seq2SeqAnalyser` for conversational systems.
+
+**Compatible tasks** : `DialogueTask`  
+**Metrics** : BLEU/ROUGE per turn, inter-turn coherence, distinct-n (diversity)  
+**Visualizations** : score evolution per turn, response length distribution
+
+---
+
+### 2.2 LLMJudgeAnalyser
+
+Evaluates free-form generation quality using an LLM-as-a-Judge approach with bias correction via the Rogan & Gladen calibration method.
+
+**Compatible tasks** : `RagTask`, `AbstractiveQATask`, `CompletionTask`, `SummarizationTask`, `DialogueTask`, `AgentTask`  
+**Metrics** : subjective scores (relevance, coherence, faithfulness) with confidence intervals, position/verbosity bias correction  
+**Visualizations** : per-criterion radar chart, score distribution per judge, calibration plot
+
+---
+
+### 2.3 RagAnalyser
+
+Evaluates RAG pipelines end-to-end: retrieval quality and conditional generation quality. Composes `RetrievalAnalyser` and `LLMJudgeAnalyser` internally.
+
+**Compatible tasks** : `RagTask`  
+**Metrics (retrieval)** : Precision@k, Recall@k, NDCG, MRR  
+**Metrics (generation)** : faithfulness, context precision, answer relevance (RAGAS)  
+**Visualizations** : retrieval vs. generation score scatter, faithfulness distribution
+
+---
+
+## 3. QAAnalyser
+
+**Scope** : question-answering tasks with or without a reference answer.
+
+---
+
+### 3.1 ExtractiveQAAnalyser
+
+Evaluates span extraction from a given context.
+
+**Compatible tasks** : `ExtractiveQATask`  
+**Metrics** : Exact Match (EM), token-level F1, position accuracy  
+**Visualizations** : span length distribution, EM vs. context length
+
+---
+
+### 3.2 AbstractiveQAAnalyser
+
+Partially inherits from `LLMJudgeAnalyser` for reference-free evaluation.
+
+**Compatible tasks** : `AbstractiveQATask`  
+**Metrics** : ROUGE/BERTScore when a reference is available, faithfulness otherwise  
+**Visualizations** : score vs. context availability, BERTScore distribution
+
+---
+
+## 4. RepresentationAnalyser
+
+**Scope** : tasks producing vector representations.
+
+---
+
+### 4.1 EmbeddingAnalyser
+
+Evaluates the quality of embedding spaces, including pairwise semantic similarity as an intrinsic probe.
+
+**Compatible tasks** : `EmbeddingTask`, `ClusteringNLPTask`  
+**Metrics** : anisotropy, intra-class cosine similarity, alignment & uniformity, Pearson/Spearman correlation on STS benchmarks  
+**Visualizations** : 2D projection (t-SNE / UMAP), cosine distance distribution, predicted vs. gold similarity scatter plot
+
+---
+
+### 4.2 UnsupervisedNLPAnalyser
+
+**Scope** : tasks without ground truth (unsupervised).
+
+---
+
+#### 4.2.1 TopicModelingAnalyser
+
+Evaluates the intrinsic quality of learned topics.
+
+**Compatible tasks** : `TopicModelingTask`  
+**Metrics** : topic coherence (C_V, C_NPMI), topic diversity, model perplexity  
+**Visualizations** : per-topic word cloud, doc-topic heatmap, coherence vs. n_topics curve
+
+---
+
+#### 4.2.2 ClusteringNLPAnalyser
+
+Evaluates the quality of document or sentence clusters.
+
+**Compatible tasks** : `ClusteringNLPTask`  
+**Metrics** : silhouette score, Davies-Bouldin index, Calinski-Harabasz; if labels are available: ARI, NMI  
+**Visualizations** : 2D projection coloured by cluster, silhouette plot, elbow curve
+
+---
+
+## 5. AudioAnalyser
+
+**Scope** : tasks operating on audio signals.
+
+---
+
+### 5.1 ASRAnalyser
+
+Evaluates automatic speech recognition output.
+
+**Compatible tasks** : `ASRTask`  
+**Metrics** : WER, CER, WER per segment/speaker  
+**Visualizations** : WER distribution by utterance length, phonetic error heatmap
+
+---
+
+### 5.2 TTSAnalyser
+
+Evaluates speech synthesis quality and intelligibility.
+
+**Compatible tasks** : `TTSTask`  
+**Metrics** : MOS (Mean Opinion Score), PESQ, UTMOS (neural MOS estimator)  
+**Visualizations** : Mel spectrogram, MOS score distribution
+
+---
+
+### 5.3 AudioClassificationAnalyser
+
+Inherits from `SequenceClassificationAnalyser`, applied to audio signals.
+
+**Compatible tasks** : `AudioClassificationTask`  
+**Metrics** : accuracy, per-class F1, AUC  
+**Visualizations** : confusion matrix, feature importance on spectrogram
+
+---
+
+### 5.4 SpeechTranslationAnalyser
+
+Combines `ASRAnalyser` (intermediate transcription) and `MachineTranslationAnalyser`.
+
+**Compatible tasks** : `SpeechTranslationTask`  
+**Metrics** : end-to-end BLEU, intermediate WER when available  
+**Visualizations** : ASR error vs. MT error decomposition
+
+---
+
+## 6. FillMaskAnalyser
+
+**Scope** : masked token prediction tasks.
+
+**Compatible tasks** : `FillMaskTask`  
+**Metrics** : top-k accuracy, MRR over vocabulary, local perplexity  
+**Visualizations** : top-k probability distribution, accuracy breakdown by grammatical category
+
+---
+
+## 7. RetrievalAnalyser
+
+**Scope** : evaluates retrieval component quality independently from generation.
+
+**Compatible tasks** : `RagTask`, `ExtractiveQATask`  
+**Metrics** : Precision@k, Recall@k, NDCG@k, MRR, MAP  
+**Visualizations** : Precision/Recall vs. k curve, rank distribution of relevant documents, relevance vs. similarity score scatter plot
+
+---
+
+## 8. XAITextAnalyser
+
+**Scope** : explainability of model predictions on text. Abstract transversal analyser applicable to any transformer-based discriminative or generative task.
+
+**Compatible tasks** : `SequenceClassificationTask`, `TokenClassificationTask`, `QATask`, `FillMaskTask`
+
+---
+
+### 8.1 FeatureImportanceAnalyser
+
+Abstract analyser that ranks input features by their contribution to a model's prediction. Covers both naive linear approaches (via model coefficients) and model-agnostic post-hoc methods.
+
+**Compatible tasks** : any task backed by a model exposing `coef_`, gradients, or a prediction function
+
+---
+
+#### 8.1.1 LinearFeatureImportanceAnalyser
+
+Extracts feature importance directly from the coefficients of an inherently interpretable linear model (logistic regression, linear SVM). No post-hoc approximation needed : importance is read from `model.coef_`.
+
+**Compatible tasks** : `SequenceClassificationTask`, `TokenClassificationTask`  
+**Methods** : `model.coef_` extraction, coefficient ranking per class, optional mapping back to original token positions via the vectorizer vocabulary  
+**Metrics** : top-k feature coefficient magnitude, sign-separated ranking (positive vs. negative contributors)  
+**Visualizations** : horizontal bar chart of top-k features per class, inline text highlighting when features map to tokens
+
+---
+
+#### 8.1.2 TokenImportanceAnalyser
+
+Explains predictions of non-linear or black-box models through post-hoc input token importance scores.
+
+**Compatible tasks** : `SequenceClassificationTask`, `TokenClassificationTask`, `NLITask`, `FillMaskTask`  
+**Methods** : SHAP (KernelSHAP / PartitionSHAP on text), LIME, Integrated Gradients, gradient × input  
+**Metrics** : faithfulness score (importance vs. perturbation correlation), sufficiency, comprehensiveness  
+**Visualizations** : token-level importance heatmap, top-k token bar chart, multi-class importance comparison
+
+---
+
+### 8.2 AttentionAnalyser
+
+Explains internal model behaviour through attention weight visualisation.
+
+**Compatible tasks** : `SequenceClassificationTask`, `TokenClassificationTask`, `Seq2SeqTask`, `RagTask`, `QATask`  
+**Methods** : attention head visualisation (BertViz-style), attention rollout, gradient-weighted attention  
+**Metrics** : attention vs. gradient importance correlation, weight concentration per head (entropy)  
+**Visualizations** : token × token heatmap per head/layer, multi-head aggregation, layer-wise evolution
+
+> Note : Attention alone is not a reliable causal explanation : combine with `TokenImportanceAnalyser` for robust conclusions.
+
+---
+
+### 8.3 CounterfactualTextAnalyser
+
+Explains decisions through minimal perturbation of the input.
+
+**Compatible tasks** : `SequenceClassificationTask`, `NLITask`, `ExtractiveQATask`  
+**Methods** : counterfactual generation via token substitution (masked LM), label-flip guided beam search  
+**Metrics** : semantic proximity between counterfactual and original (cosine similarity), label flip rate, counterfactual fluency  
+**Visualizations** : original vs. counterfactual coloured diff, semantic distance distribution

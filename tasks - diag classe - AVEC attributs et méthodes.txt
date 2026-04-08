@@ -1,0 +1,199 @@
+classDiagram
+    class NLPTask {
+        <<abstract>>
+        +str task_name
+        +str language
+        +Any model
+        +run(input_data) OutputData
+        +preprocess(raw) InputData
+        +postprocess(raw) OutputData
+    }
+
+    class NLPDiscriminativeTask {
+        <<abstract>>
+        +List~str~ label_set
+        +predict(input_data) Label
+    }
+
+    class NLPGenerativeTask {
+        <<abstract>>
+        +int max_new_tokens
+        +float temperature
+        +generate(input_data) str
+    }
+
+    class NLPRepresentationTask {
+        <<abstract>>
+        +int representation_dim
+        +represent(input_data) ndarray
+    }
+
+    class AudioTask {
+        <<abstract>>
+        +int sample_rate
+        +str audio_format
+        +load_audio(path) ndarray
+    }
+
+    class QATask {
+        <<abstract>>
+        +str context
+        +str question
+    }
+
+    NLPTask <|-- NLPDiscriminativeTask
+    NLPTask <|-- NLPGenerativeTask
+    NLPTask <|-- NLPRepresentationTask
+    NLPTask <|-- AudioTask
+    NLPTask <|-- QATask
+
+    class SequenceClassificationTask {
+        +str input_granularity
+        +Dict~str, int~ label2id
+        +predict_proba(text) Dict~str, float~
+    }
+
+    class NLITask {
+        +str premise
+        +str hypothesis
+        +predict_relation() str
+    }
+
+    class TokenClassificationTask {
+        +List~str~ label_set
+        +str label_scheme
+        +predict(tokens) List~str~
+        +extract_spans(tokens) List~Dict~
+    }
+
+    class FillMaskTask {
+        +str mask_token
+        +int top_k
+        +fill(masked_text) List~Dict~
+    }
+
+    NLPDiscriminativeTask <|-- SequenceClassificationTask
+    SequenceClassificationTask <|-- NLITask
+    NLPDiscriminativeTask <|-- TokenClassificationTask
+    NLPDiscriminativeTask <|-- FillMaskTask
+
+    class ExtractiveQATask {
+        +extract_span(context, question) str
+        +get_answer_char_positions() Tuple~int, int~
+    }
+
+    class AbstractiveQATask {
+        +generate_answer(context, question) str
+    }
+
+    QATask <|-- ExtractiveQATask
+    QATask <|-- AbstractiveQATask
+
+    class CompletionTask {
+        +str prompt_template
+        +complete(prompt) str
+    }
+
+    class CodeGenerationTask {
+        +str programming_language
+        +generate_code(instruction) str
+    }
+
+    class Seq2SeqTask {
+        +generate(source) str
+    }
+
+    class MachineTranslationTask {
+        +str src_lang
+        +str tgt_lang
+        +translate(text) str
+    }
+
+    class SummarizationTask {
+        +int max_summary_length
+        +str summary_style
+        +summarize(document) str
+    }
+
+    class DialogueTask {
+        +List~Dict~ history
+        +str system_prompt
+        +respond(utterance) str
+        +reset_history()
+    }
+
+    class RagTask {
+        +Any retriever
+        +int top_k_docs
+        +retrieve(query) List~str~
+        +generate_with_context(query) str
+    }
+
+    class AgentTask {
+        +List~Any~ tools
+        +int max_steps
+        +run_agent(objective) str
+        +call_tool(name, args) Any
+    }
+
+    NLPGenerativeTask <|-- CompletionTask
+    CompletionTask <|-- CodeGenerationTask
+    NLPGenerativeTask <|-- Seq2SeqTask
+    Seq2SeqTask <|-- MachineTranslationTask
+    Seq2SeqTask <|-- SummarizationTask
+    Seq2SeqTask <|-- DialogueTask
+    NLPGenerativeTask <|-- RagTask
+    NLPGenerativeTask <|-- AgentTask
+
+    class EmbeddingTask {
+        +str pooling_strategy
+        +bool normalize
+        +embed(texts) ndarray
+    }
+
+    class TopicModelingTask {
+        +int n_topics
+        +int n_top_words
+        +fit(documents)
+        +get_topics() List~List~str~~
+        +get_doc_topics(doc) Dict
+    }
+
+    class ClusteringNLPTask {
+        +int n_clusters
+        +fit(documents)
+        +get_cluster_labels() List~int~
+    }
+
+    NLPRepresentationTask <|-- EmbeddingTask
+    NLPRepresentationTask <|-- TopicModelingTask
+    NLPRepresentationTask <|-- ClusteringNLPTask
+
+    class ASRTask {
+        +str model_type
+        +transcribe(audio) str
+        +transcribe_with_timestamps(audio) List~Dict~
+    }
+
+    class ASTTask {
+        +str src_lang
+        +str tgt_lang
+        +translate_audio(audio) str
+    }
+
+    class TTSTask {
+        +str voice_id
+        +int output_sample_rate
+        +synthesize(text) ndarray
+    }
+
+    class AudioClassificationTask {
+        +List~str~ audio_labels
+        +classify(audio) str
+        +predict_proba(audio) Dict~str, float~
+    }
+
+    AudioTask <|-- ASRTask
+    AudioTask <|-- ASTTask
+    AudioTask <|-- TTSTask
+    AudioTask <|-- AudioClassificationTask

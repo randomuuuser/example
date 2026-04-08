@@ -1,0 +1,66 @@
+## TokenClassificationAnalyser (abstract)
+
+### Attributes
+
+- **y_true**: List of ground truth labels per token (e.g., `["B-PER", "I-PER", "O"]` or `["NOUN", "VERB"]`).
+- **y_pred**: List of predicted labels per token, same length as y_true.
+- **accuracy**: Float representing token-level correct predictions (e.g., `0.94`).
+- **confusion_matrix**: 2D numpy array where rows are true labels, columns are predicted labels.
+- **per_label_f1**: Dictionary mapping each token-level label to its F1-score (e.g., `{"B-PER": 0.91, "I-PER": 0.88, "O": 0.96}`). Evaluates per-token classification independently.
+
+### Methods
+
+- **evaluate()**: Computes accuracy, per-label F1, and confusion matrix from y_true and y_pred. Stores results in attributes.
+- **plot_confusion_matrix()**: Generates a heatmap of the confusion matrix, optionally normalized.
+- **plot_per_label_f1()**: Produces a bar chart showing F1-score for each label, sorted by value.
+- **get_classification_report()**: Returns a formatted string with precision, recall, and F1 per label (scikit-learn style).
+
+---
+
+## NERAnalyser (inherits TokenClassificationAnalyser)
+
+### Attributes
+
+- **bio_scheme**: String indicating tagging format (e.g., `"BIO"` (B → Beginning of entity, I → Inside entity, O → Outside entity), `"BIOUL"`). Used to parse entity boundaries. 
+- **use_span_matching**: Boolean controlling entity evaluation strictness.
+
+   - `True`: Requires both exact boundary and label to be correct (e.g., the ground truth `"Barack Obama"` as `PERSON` is correct only if prediction covers both tokens with `PERSON`. Predicting only `"Barack"` or both tokens with wrong label fails).
+   - `False`: Token-level evaluation (e.g., predicting `B-PER` on `"Barack"` and `I-PER` on `"Obama"` counts as two correct token predictions, even if entity boundaries are wrong).
+
+
+
+- **entity_f1**: Dictionary mapping each entity type to its span-level F1-score (e.g., `{"PERSON": 0.89, "LOC": 0.85}`). 
+   - Note : An entity prediction is considered correct only if the model identifies the exact starting token, the exact ending token, and the correct entity type (e.g., the ground truth `"Barack Obama"` as `PERSON` spanning tokens [0,1], predicting `"Barack"` alone, `"Obama"` alone, or `"Barack Obama"` as `ORG` all count as incorrect for this entity).
+
+
+
+
+
+### Methods
+
+- **evaluate_spans()**: Computes span-level precision, recall, and F1 using entity boundaries instead of individual tokens.
+- **plot_entity_f1()**: Bar chart of F1-score per entity type (PERSON, ORG, LOC, etc.).
+- **analyze_boundary_errors()**: Returns a DataFrame categorizing errors as missing entities, spurious entities, or boundary shifts (e.g., `"Barack Obama"` predicted as `"Barack"` only).
+
+---
+
+## POSTaggingAnalyser (inherits TokenClassificationAnalyser)
+
+### Attributes
+
+- **tagset**: String defining the POS label set.  Influences granularity of evaluation.
+
+   - `"universal"`: 12 coarse tags (`NOUN`, `VERB`, `ADJ`, `ADV`, `PRON`, `DET`, `ADP`, `CONJ`, `NUM`, `PRT`, `X`, `.`).
+   - `"penn"`: 36 fine-grained tags from Penn Treebank (e.g., `NN` = singular noun, `NNS` = plural noun, `VB` = base verb, `VBD` = past tense verb).
+
+- **unknown_indices**: List of token positions (e.g., `[5, 12, 33]`) where the word was not seen during training (oov) . 
+  - Example: test sentence `"The cat slept in my room"` with training vocabulary `{"the", "cat", "slept", "in", "room"}` yields `unknown_indices = [4]` for position of `"my"`.
+- **oov_accuracy**: Float representing accuracy (e.g., `0.72`) only on unknown words; Out-of-vocabulary words not present in the model's training data. it measures this generalization capability.
+
+
+
+### Methods
+
+- **evaluate_oov()**: Computes accuracy, precision, recall, and F1 restricted to tokens in unknown_indices.
+- **plot_ambiguity()**: Shows performance difference between ambiguous words (e.g., "fly" as NOUN/VERB) and unambiguous words.
+- **plot_length_accuracy()**: Line chart of accuracy as a function of word length (number of characters).

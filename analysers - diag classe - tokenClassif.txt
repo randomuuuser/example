@@ -1,0 +1,34 @@
+classDiagram
+    class TokenClassificationAnalyser {
+        <<abstract>>
+        +List~str~ y_true
+        +List~str~ y_pred
+        +float accuracy
+        +ndarray confusion_matrix
+        +Dict per_label_f1
+        +evaluate()
+        +plot_confusion_matrix()
+        +plot_per_label_f1()
+        +get_classification_report()
+    }
+    
+    class NERAnalyser {
+        +str bio_scheme
+        +bool use_span_matching
+        +Dict entity_f1
+        +evaluate_spans()
+        +plot_entity_f1()
+        +analyze_boundary_errors()
+    }
+    
+    class POSTaggingAnalyser {
+        +str tagset
+        +List~int~ unknown_indices
+        +float oov_accuracy
+        +evaluate_oov()
+        +plot_ambiguity()
+        +plot_length_accuracy()
+    }
+    
+    TokenClassificationAnalyser <|-- NERAnalyser
+    TokenClassificationAnalyser <|-- POSTaggingAnalyser

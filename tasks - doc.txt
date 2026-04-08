@@ -1,0 +1,225 @@
+# NLP Tasks - Class Overview
+
+---
+
+## Root & branches
+
+- `NLPTask` : abstract root of all tasks. Holds attributes shared across
+  every NLP task.
+  - `task_name: str` : human-readable identifier for the task.
+  - `language: Optional[str]` : code of the language processed.
+  - `model: Any` : underlying model object (transformer, pipeline, etc.).
+  - `run(input_data) OutputData` : main entry point: preprocess → infer →
+    postprocess.
+  - `preprocess(raw) InputData` : converts raw input into model-ready format.
+  - `postprocess(raw) OutputData` : converts raw model output into structured
+    result.
+
+- `NLPDiscriminativeTask` : groups tasks that *analyse* an existing text to
+  extract information (label, span, score). *Ex: detecting sentiment in a
+  customer review.*
+  - `label_set: List[str]` : exhaustive list of possible output labels.
+  - `predict(input_data) Label` : returns the most likely label for the input.
+
+- `NLPGenerativeTask` : groups tasks that *produce* new text from an input.
+  *Ex: generating a summary or a code snippet.*
+  - `max_new_tokens: int` : upper bound on the number of tokens to generate.
+  - `temperature: float` : controls output randomness during sampling.
+  - `generate(input_data) str` : runs the generative inference pipeline.
+
+- `NLPRepresentationTask` : groups tasks that *transform* text into a
+  numerical representation (vector, topic distribution, cluster-space projection). *Ex: encoding sentences for semantic search.*
+  - `representation_dim: int` : dimensionality of the output representation space.
+  - `represent(input_data) ndarray` : maps input text to a numerical representation suitable for downstream comparison, grouping, or analysis.
+
+- `AudioTask` : branch for tasks whose input or output is an audio signal.
+  *Ex: transcribing a phone call.*
+  - `sample_rate: int` : audio sampling frequency in Hz.
+  - `audio_format: str` : file format (wav, flac, mp3, etc.).
+  - `load_audio(path) ndarray` : loads and normalises an audio file into
+    a float array.
+
+- `QATask` : branch for question-answering tasks that produce answers to natural-language questions independently of whether the answer is extracted from text or generated. *Ex: answering "what is the delivery deadline?" in a contract.*
+  - `context: str` : source document or passage used to answer.
+  - `question: str` : question to answer.
+
+---
+
+## Discriminative - sequence classification
+
+- `SequenceClassificationTask` : assigns a label to an entire text sequence.
+  *Ex: classifying an email as spam or not.*
+  - `input_granularity: str` : scope of the input (sentence, paragraph,
+    document).
+  - `label2id: Dict[str, int]` : mapping from label names to class indices.
+  - `predict_proba(text) Dict[str, float]` : returns a probability
+    distribution over all labels.
+
+- `NLITask` : determines whether a hypothesis  is true (entailment), false (contradiction), or undetermined (neutral) with respect to a premise. *Ex: automated fact-checking.*
+  - `premise: str` : reference statement.
+  - `hypothesis: str` : statement to verify against the premise.
+  - `predict_relation() str` : returns entailment / contradiction / neutral.
+
+---
+
+## Discriminative - token classification
+
+- `TokenClassificationTask` : assigns a label to each token in a sequence.
+  *Ex: part-of-speech tagging or named entity recognition.*
+  - `label_set: List[str]` : set of possible token-level labels predicted by the model (e.g. NOUN, VERB, B-PER, I-ORG).
+  - `label_scheme: str` : optional encoding convention for structured labels (e.g. BIO, BIOES).
+  - `predict(tokens) List[str]` : returns a label sequence aligned with the input tokens.
+  - `extract_spans(tokens) List[Dict]` : optionally reconstructs labelled spans when the task uses span-based annotations (e.g. named entities).
+
+---
+
+## Discriminative - extractive QA
+
+- `ExtractiveQATask` : extracts an answer span from a context passage, without generating new text.  
+  *Ex: SQuAD-style QA, highlighting the answer directly in a paragraph.*  
+  - `extract_span(context, question) str` : locates and returns the answer span.  
+  - `get_answer_char_positions() Tuple[int, int]` : returns the character-level start and end positions of the extracted span.
+
+---
+
+## Discriminative - masked token prediction
+
+- `FillMaskTask` : predicts masked tokens in a sentence using masked language modeling (MLM).  
+ *Ex: "The capital of France is [MASK]."*  
+  - `mask_token: str` : special token used to mark the position to predict.  
+  - `top_k: int` : number of top candidates to return.  
+  - `fill(masked_text) List[Dict]` : returns a ranked list of `{token, score}` candidates.
+
+---
+
+## Generative - completion
+
+- `CompletionTask` : generates free-form text from a prompt using autoregressive language modeling. *Ex: completing the sentence "The future of AI is...".*
+  - `prompt_template: str` : instruction string that defines the structure of the input prompt.  
+  - `complete(prompt) str` : generates and returns a text completion.
+
+- `CodeGenerationTask` : specialises completion for producing code in a
+  target programming language. *Ex: generating a Python function from a
+  docstring.*
+  - `programming_language: str` : target language (python, javascript, etc.).
+  - `generate_code(instruction) str` : returns a code snippet matching the
+    instruction.
+
+---
+
+## Generative - seq2seq
+
+- `Seq2SeqTask` : generates text conditioned on a source sequence using the 
+  encoder-decoder paradigm.
+  - `generate(source) str` : encodes the source and decodes the output sequence.
+
+
+- `MachineTranslationTask` : translates text from a source language to a
+  target language. *Ex: translating FR→EN subtitles.*
+  - `src_lang: str` : code of the source language.
+  - `tgt_lang: str` : code of the target language.
+  - `translate(text) str` : returns the translated text.
+
+- `SummarizationTask` : condenses a long text into a shorter summary.
+  *Ex: summarising financial reports.*
+  - `max_summary_length: int` : maximum number of tokens in the output.
+  - `summary_style: str` : generation mode (abstractive or extractive).
+  - `summarize(document) str` : returns the generated summary.
+
+
+- `DialogueTask` : generates the next assistant reply from the current user utterance conditioned on the full prior conversation history.
+  *Ex: multi-turn customer support assistant.*
+  - `history: List[Dict]` : ordered list of past turns as
+    `{role, content}` dicts.
+  - `system_prompt: str` : instruction string that guides the assistant's behaviour in the conversation.
+  - `respond(utterance) str` : appends the user turn and generates the next
+    assistant reply.
+  - `reset_history()` : clears the conversation history.
+
+
+- `AbstractiveQATask` : generates an answer in natural language, potentially rephrasing or expanding on the context. *Ex: answering with a reformulated explanation.*
+  - `generate_answer(context, question) str` : produces an answer
+    conditioned on the context.
+---
+
+## Generative - Tool-augmented generation
+
+- `RagTask` : retrieves relevant information from a knowledge base and generates answers conditioned on it. *Ex: chatbot answering from
+  internal documentation.*
+  - `retriever: Any` : retrieval component (dense, sparse, or hybrid).
+  - `top_k_docs: int` : number of documents retrieved per query.
+  - `retrieve(query) List[str]` : fetches the most relevant passages.
+  - `generate_with_context(query) str` : generates an answer conditioned
+    on the retrieved passages.
+
+- `AgentTask` : plans and executes actions in a loop by calling tools until
+  an objective is reached. *Ex: an agent that searches, compares, and
+  synthesises information from multiple sources.* 
+  - `tools: List[Any]` : list of callable tool objects available to the agent.
+  - `max_steps: int` : maximum number of reasoning / action steps allowed.
+  - `run_agent(objective) str` : runs the full agentic loop and returns the
+    final answer.
+  - `call_tool(name, args) Any` : executes a single tool.
+
+---
+
+## Representation
+
+- `EmbeddingTask` : encodes text into a dense vector
+  in a semantic space. *Ex: encoding sentences to feed a vector search
+  engine.*
+  - `pooling_strategy: str` : aggregation method over token embeddings
+    (mean, cls, max).
+  - `normalize: bool` : whether to L2-normalise the output vectors.
+  - `embed(texts) ndarray` : returns a matrix of shape
+    `(n_texts, embedding_dim)`.
+
+
+- `TopicModelingTask` : identifies hidden topics in a corpus without supervision. *Ex: extracting main themes from customer reviews, like "delivery", "product quality", or "support".*
+  - `n_topics: int` : number of topics to learn.
+  - `n_top_words: int` : number of representative words returned per topic.
+  - `fit(documents)` : trains the topic model on the corpus.
+  - `get_topics() List[List[str]]` : returns the main words that define each topic across the entire collection of documents.
+  - `get_doc_topics(doc) Dict` : returns the topic distribution for a single
+    document.
+
+- `ClusteringNLPTask` : groups similar texts into clusters without predefined
+  labels. *Ex: grouping customer feedback by similarity.*
+  - `n_clusters: Optional[int]` : number of clusters to form.
+  - `fit(documents)` : fits the clustering model on the document embeddings.
+  - `get_cluster_labels() List[int]` : returns the cluster index assigned to
+    each document.
+
+---
+
+## Audio
+
+- `ASRTask` : transcribes audio into text (Automatic Speech Recognition).
+  *Ex: transcribing Teams meetings.*
+  - `model_type: str` : ASR architecture family (CTC, attention,
+    transducer).
+  - `transcribe(audio) str` : returns the plain text transcription.
+  - `transcribe_with_timestamps(audio) List[Dict]` : returns a list of
+    `{word, start, end}` aligned segments.
+
+- `ASTTask` : translates audio into text (Automatic Speech Translation) in a
+  target language. *Ex: translating a conference talk from French to English.*
+  - `src_lang: str` : language spoken in the audio input.
+  - `tgt_lang: str` : target language of the text output.
+  - `translate_audio(audio) str` : returns the translated transcript.
+
+- `TTSTask` : synthesises audio from text (Text-to-Speech).
+  *Ex: generating a voice for a virtual assistant.*
+  - `voice_id: str` : identifier of the speaker voice or style.
+  - `output_sample_rate: int` : sampling rate of the generated audio in Hz.
+  - `synthesize(text) ndarray` : generats and returns the waveform as a float
+    array.
+
+- `AudioClassificationTask` : assigns a label to an audio segment.
+  *Ex: classifying customer requests.*
+  - `audio_labels: List[str]` : list of possible output categories.
+  - `classify(audio) str` : returns the predicted label.
+  - `predict_proba(audio) Dict[str, float]` : returns a probability
+    distribution over all audio labels.
+
+
