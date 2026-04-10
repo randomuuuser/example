@@ -1,0 +1,97 @@
+Je vais analyser ton document d'analysers en le croisant avec ton diagramme de classes. Laisse-moi lire les deux attentivement.Voici mon analyse, organisée par famille d'analyseurs.
+
+---
+
+## Analyse globale
+
+La structure est solide : la hiérarchie est cohérente, la séparation entre analyseurs standalone et composables est bien pensée, et les principes de design en fin de document sont bons. Voici les points à corriger ou questionner.
+
+---
+
+### 1. `ClassificationAnalyser`
+
+**Incohérences**
+
+`SequenceClassificationAnalyser` liste `AudioClassificationTask` dans ses compatible tasks (§1.1), mais `AudioClassificationAnalyser` (§5.3) existe déjà et hérite directement de `SequenceClassificationAnalyser`. C'est redondant et potentiellement confus — retire `AudioClassificationTask` de §1.1 pour éviter l'ambiguïté.
+
+**Oublis pertinents**
+
+`NERAnalyser` (§1.2.1) manque la métrique **partial match F1** (entités partiellement correctes), qui est standard dans les benchmarks NER modernes (CoNLL, ACE). Le boundary error rate seul ne suffit pas à distinguer les erreurs de type des erreurs de span.
+
+`POSTaggingAnalyser` (§1.2.2) : pas de mention de la stratification par **catégorie grammaticale** dans les métriques (nom, verbe, adj.), alors que tu la mentionnes dans les visualisations. Cohérence à aligner.
+
+---
+
+### 2. `GenerationAnalyser`
+
+**Oublis pertinents**
+
+`Seq2SeqAnalyser` (§2.1) : **METEOR** est listé, mais pas `MQM` (Multidimensional Quality Metrics) pour la traduction — c'est overkill pour une lib interne, mais `chrF` aurait sa place ici en plus de dans `MachineTranslationAnalyser`, car c'est un métrique généraliste seq2seq.
+
+`SummarizationAnalyser` (§2.1.2) : le **faithfulness score via NLI classifier** est bien vu, mais il manque une métrique de **coverage** (proportion des faits clés de la source couverts dans le résumé), distincte de l'extractive density.
+
+`DialogueAnalyser` (§2.1.3) : l'**inter-turn semantic coherence** est défini comme "consecutive response similarity" — c'est une approximation grossière. Pour un système interne, tu pourrais simplement le renommer "response-to-prompt similarity" pour être plus précis, ou le retirer si tu ne comptes pas vraiment l'implémenter (risque de métrique vide).
+
+`LLMJudgeAnalyser` (§2.2) : pas de mention de **self-consistency check** (lancer le même prompt judge N fois et mesurer la variance). C'est complémentaire au Rogan & Gladen que tu utilises déjà, et pertinent pour un usage production.
+
+**Overkill potentiel**
+
+`RagAnalyser` (§2.4) : la **2D density plot** context precision vs answer relevance est probablement surdimensionnée pour un usage interne — un scatter plot simple ou même un tableau suffit dans la majorité des workflows RAG. À garder seulement si tu vises une interface analytique avancée.
+
+---
+
+### 3. `ExtractiveQAAnalyser`
+
+Pas de problème majeur. Une seule question : l'**answer position accuracy** est-elle vraiment utile comme métrique standalone ? Ce qui importe en pratique c'est l'overlap (EM + F1) — la position relative dans le contexte est rarement exploitée. Tu peux la garder mais documente un cas d'usage concret, sinon c'est du bruit.
+
+---
+
+### 4. `RepresentationAnalyser`
+
+**Oublis pertinents**
+
+`EmbeddingAnalyser` (§4.1) : pas de mention de **Intrinsic Dimensionality** (ID) comme mesure de la richesse de l'espace — c'est une métrique moderne et parlante pour diagnostiquer si le modèle collapse ses représentations. Pertinent surtout si vous comparez plusieurs modèles d'embedding.
+
+`ClusteringNLPAnalyser` (§4.2.2) : la liste de métriques (silhouette, Davies-Bouldin, Calinski-Harabasz) est complète. Mais **aucune visualisation ne montre l'évolution des métriques en fonction de k** (nombre de clusters) — le elbow curve sur l'inertie est mentionné, mais il faudrait aussi la courbe silhouette vs k, qui est plus robuste.
+
+---
+
+### 5. `AudioAnalyser`
+
+**Incohérences**
+
+`SpeechTranslationAnalyser` (§5.4) liste `ASTTask` dans les compatible tasks, mais `ASTTask` est aussi listé dans `MachineTranslationAnalyser` (§2.1.1) — ce dernier point est incohérent avec la hiérarchie. `ASTTask` est une tâche audio, pas une tâche texte-à-texte. À retirer de §2.1.1.
+
+**Oublis pertinents**
+
+`ASRAnalyser` (§5.1) : manque la métrique **RTF (Real-Time Factor)** si vous comparez des modèles en conditions de déploiement — c'est une métrique opérationnelle, pas de qualité, mais pertinente pour un usage interne. À mettre en note optionnelle.
+
+`TTSAnalyser` (§5.2) : manque un indicateur de **naturalness / prosody** distinct du MOS global (ex. **F0 continuity**, pitch error). Le MOS seul mélange intelligibilité et naturalité — difficile de diagnostiquer d'où vient un problème.
+
+---
+
+### 6. `FillMaskAnalyser`
+
+La **pseudo-log-likelihood** comme proxy de perplexité locale est pertinente, mais attention : ce n'est pas une métrique d'évaluation de prédiction, c'est une métrique de confiance du modèle sur le contexte. Soit tu la documentas clairement comme telle, soit tu la retires pour éviter la confusion avec les métriques de ranking.
+
+---
+
+### 7. `RetrievalAnalyser`
+
+Complet. Le seul ajout discutable serait **Hit Rate@k** (est-ce qu'au moins un document pertinent est dans les top-k ?), mais c'est redondant avec Recall@k si tu l'as déjà. À ne pas ajouter.
+
+---
+
+### 8. `XAITextAnalyser`
+
+**Incohérences**
+
+`AttentionAnalyser` (§8.2) liste `RagTask` dans ses compatible tasks, mais l'attention dans un système RAG est distribuée sur deux modèles (retriever + generator) avec des architectures souvent incompatibles. C'est soit mal scopé, soit il faut préciser que ça ne s'applique qu'au generator LLM dans le pipeline RAG.
+
+**Overkill**
+
+`CounterfactualTextAnalyser` (§8.3) : le **label flip rate** combiné avec la **fluency perplexity** sont deux critères de qualité des counterfactuals qui imposent deux modèles supplémentaires (LM masked pour la génération, LM causal pour la perplexité). C'est ambitieux pour une lib interne — vérifie que tu as des use cases qui justifient cette complexité avant de le graver dans l'architecture.
+
+---
+
+**Résumé des actions**Les points les plus impactants à traiter en priorité : l'incohérence sur `ASTTask` dans §2.1.1, la redondance `AudioClassificationTask` dans §1.1, et le manque de `partial match F1` dans `NERAnalyser` — ce sont des erreurs de modélisation, pas juste des oublis de métriques.
