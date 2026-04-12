@@ -1,0 +1,193 @@
+classDiagram
+    class NLPTask {
+        <<abstract>>
+        +str task_name
+        +Any model
+        +run(input_data) Any
+
+    }
+
+
+    class NLPDiscriminativeTask {
+        <<abstract>>
+        +Dict~str,int~ label2id
+        +predict(input_data) Any
+        +predict_proba(input_data) Dict~str,float~
+        +get_labels() List~str~
+    }
+
+    class NLPGenerativeTask {
+        <<abstract>>
+        +int max_new_tokens
+        +float temperature
+        +generate(input_data) str
+    }
+
+    class NLPRepresentationTask {
+        <<abstract>>
+        +int representation_dim
+    }
+
+    class AudioTask {
+        <<abstract>>
+        +int sample_rate
+        +int channels
+        +str audio_format
+        +load_audio(path) ndarray
+    }
+
+    class ExtractiveQATask {
+        +str context
+        +str question
+        +extract_span() str
+        +get_answer_char_positions() Tuple~int,int~
+    }
+
+    NLPTask <|-- NLPDiscriminativeTask
+    NLPTask <|-- NLPGenerativeTask
+    NLPTask <|-- NLPRepresentationTask
+    NLPTask <|-- AudioTask
+    NLPTask <|-- ExtractiveQATask
+    NLPTask <|-- TopicModelingTask
+    NLPTask <|-- ClusteringNLPTask
+
+
+    class SequenceClassificationTask {
+        +predict(text) str
+        +predict_proba(text) Dict~str,float~
+    }
+
+    class NLITask {
+        +str premise
+        +str hypothesis
+    }
+
+    NLPDiscriminativeTask <|-- SequenceClassificationTask
+    SequenceClassificationTask <|-- NLITask
+
+
+
+    class TokenClassificationTask {
+        +predict(tokens) List~str~
+        +predict_proba(tokens) List~Dict~
+    }
+
+    class NERTask {
+        +List~str~ entity_types
+        +str label_scheme
+        +extract_spans(tokens) List~Dict~
+    }
+
+    class POSTaggingTask {
+        +str tagset
+    }
+
+    NLPDiscriminativeTask <|-- TokenClassificationTask
+    TokenClassificationTask <|-- NERTask
+    TokenClassificationTask <|-- POSTaggingTask
+
+    class FillMaskTask {
+        +str mask_token
+        +int top_k
+        +fill(masked_text) List~Dict~
+    }
+
+    NLPTask <|-- FillMaskTask
+
+    class CompletionTask {
+        +str prompt_template
+        +complete(input_data) str
+    }
+
+    NLPGenerativeTask <|-- CompletionTask
+
+    class Seq2SeqTask {
+        +encode_decode(source) str
+    }
+
+    class MachineTranslationTask {
+        +str src_lang
+        +str tgt_lang
+        +translate(text) str
+    }
+
+    class SummarizationTask {
+        +int max_summary_length
+        +summarize(text) str
+    }
+
+    class DialogueTask {
+        +List~Dict~ history
+        +str system_prompt
+        +respond(utterance) str
+        +reset_history()
+    }
+
+    NLPGenerativeTask <|-- Seq2SeqTask
+    Seq2SeqTask <|-- MachineTranslationTask
+    Seq2SeqTask <|-- SummarizationTask
+    Seq2SeqTask <|-- DialogueTask
+
+    class RagTask {
+        +Any retriever
+        +Any vector_store
+        +int top_k_docs
+        +retrieve(query) List~str~
+        +generate(query) str
+    }
+
+    class AgentTask {
+        +List~Any~ tools
+        +int max_steps
+        +Optional~Any~ memory
+        +run_agent(objective) str
+        +call_tool(name, args~Dict~str,Any~~) Any
+    }
+
+    NLPGenerativeTask <|-- RagTask
+    NLPGenerativeTask <|-- AgentTask
+
+    class EmbeddingTask {
+        +str pooling_strategy
+        +bool normalize
+        +embed(texts) ndarray
+    }
+
+    class TopicModelingTask {
+        +int n_topics
+        +int n_top_words
+        +fit(documents) TopicModelingTask
+        +get_topics() List~List~str~~
+        +get_doc_topics(document) Dict~int,float~
+    }
+
+    class ClusteringNLPTask {
+        +Optional~int~ n_clusters
+        +fit(texts) ClusteringNLPTask
+        +get_cluster_labels() List~int~
+    }
+
+    NLPRepresentationTask <|-- EmbeddingTask
+    
+
+    class ASRTask {
+        +bool return_timestamps
+        +transcribe(audio) str | List~Dict~
+
+    }
+
+    class ASTTask {
+        +str src_lang
+        +str tgt_lang
+        +translate_audio(audio) str
+    }
+
+    class TTSTask {
+        +str voice_id
+        +int output_sample_rate
+        +synthesize(text) Any
+    }
+
+    AudioTask <|-- ASRTask
+    AudioTask <|-- ASTTask
+    AudioTask <|-- TTSTask

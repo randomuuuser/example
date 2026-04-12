@@ -1,0 +1,84 @@
+- `FillMaskTask` — Inherits directly from `NLPTask` rather than
+  `NLPDiscriminativeTask` because predictions are made over the full
+  model vocabulary — there is no fixed, enumerable `label2id`.
+
+- `Seq2SeqTask` —   For abstractive QA (answer generation from a context passage),
+  instantiate `Seq2SeqTask` with an appropriate `prompt_template` —
+  no dedicated subclass is needed.
+
+- `NLPDiscriminativeTask` —   - `predict(input_data) Any` — returns the model prediction. Return
+    type is `Any` at this level because subclasses produce different
+    output types: `SequenceClassificationTask` returns a scalar label,
+    `TokenClassificationTask` returns `List[str]`. Each subclass
+    overrides this signature with the precise return type.
+
+- `ExtractiveQATask` :   - `extract_span() str` : singular because
+    extractive QA targets one answer, unlike `extract_spans()` in
+    `TokenClassificationTask` which reconstructs all entity spans in a
+    sequence.
+
+
+- supervised/unsupervised n'est pas une propriété de la task, c'est une propriété du paradigme d'entraînement du modèle.
+
+
+## RAGTASK et AGENTTASK (nouvelle classe à part pour tool-augmented?)
+la solution dépend de l'ambition du framework :
+- Si le framework est destiné à rester centré sur les tâches NLP classiques → les garder sous NLPGenerativeTask est un compromis acceptable et défendable : "elles produisent du texte, l'héritage est justifié par le contrat génératif"
+- Si le framework a vocation à accueillir des pipelines plus complexes à l'avenir → créer une branche NLPCompositeTask est le bon choix et anticipera des extensions comme ConversationalRagTask
+- Conclusion : RagTask et AgentTask sont effectivement des pipelines orchestrés. Nous les avons placés sous NLPGenerativeTask car leur contrat d'exécution principal reste GENERATIF — max_new_tokens et temperature s'y appliquent directement. Une branche dédiée est envisagée si le framework évolue vers des architectures multi-étapes plus complexes (qui ne produisent pas forcément un outptu GENERATIF).
+
+
+## ExtractiveQA
+extractive QA ≠ classification
+extractive QA ≠ génération libre
+extractive QA = span extraction conditionnée par (question, contexte) et n'a pas un set de labels fixes
+→ donc une catégorie séparée est justifiée.
+
+## TOPIC ET CLUSTERING
+- Ces tâches ne produisent pas de représentation au sens strict — elles découvrent une structure latente dans un corpus. Elles héritent directement de NLPTask pour éviter un héritage artificiel
+- TopicModelingTask → représente un document comme une distribution sur des topics {topic_id: weight}
+- ClusteringNLPTask → représente un document comme un indice de cluster int
+
+
+
+## **Cross-modal embeddings (text + image)** ##############################################################
+
+Des modèles comme CLIP (OpenAI) encodent à la fois du texte et des images dans le **même espace vectoriel**. Résultat : on peut calculer une similarité entre une image et une phrase.
+
+*Ex : donner l'image d'un chat → obtenir un vecteur → le comparer au vecteur de "a cat sitting on a sofa".*
+
+Lien avec `NLPRepresentationTask` :
+- `representation_dim` ✅ — le vecteur a une dimension fixe (512, 768…)
+- `represent(input_data) ndarray` ✅ — l'output est bien un vecteur dense
+
+**Dense document indexing**
+
+Des modèles comme DPR (Dense Passage Retrieval) encodent des documents entiers en vecteurs denses pour les stocker dans un index (FAISS, Chroma) et faire de la recherche sémantique rapide.
+
+*Ex : encoder 10 000 articles → les stocker → à la requête "climate change solutions", retrouver les 5 articles les plus proches vectoriellement.*
+
+Lien avec `NLPRepresentationTask` :
+- `representation_dim` ✅ — dimension du vecteur d'indexation
+- `represent(input_data) ndarray` ✅ — l'output est un vecteur dense
+
+---
+
+Les deux utilisent réellement `representation_dim` et `represent()` — la note est donc scientifiquement correcte et défendable devant des experts.
+
+
+
+## TSNE et UMAP
+C'est clairement des techniques de **visualisation dans les analysers**, pas des tasks.
+
+**Pourquoi pas dans les tasks :**
+
+t-SNE et UMAP ne produisent pas une représentation *utile* en soi — leur output (vecteurs 2D/3D) n'est pas exploitable pour de la similarité, du retrieval, ou du clustering en production. Ce sont des projections **destructrices** (non inversibles) uniquement faites pour l'œil humain. Les passer comme `model` dans une `NLPRepresentationTask` serait conceptuellement faux — `representation_dim=2` pour faire du t-SNE n'a aucun sens métier.
+
+**Pourquoi dans les analysers :**
+
+On les utilise déjà implicitement dans :
+- `EmbeddingAnalyser` → projection 2D des embeddings pour visualiser la structure sémantique
+- `ClusteringNLPAnalyser` → projection 2D colorée par cluster
+- `TopicModelingAnalyser` → projection 2D des distributions doc-topic
+
+C'est leur rôle naturel : prendre des vecteurs haute dimension produits par une task, les projeter en 2D pour que l'analyser puisse les afficher. Ils sont des **outils internes des visualisations**, pas des tâches à évaluer.

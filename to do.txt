@@ -1,0 +1,115 @@
+
+
+
+
+
+## A verifier Analysers
+- est ce que ExtractiveQAAnalyser nécessite vraiement MRR@k ou c'est overkill
+- LLMJudgeAnalyser OU  raganalyser : intégrer les evaluations de webshowcase
+- revoir le contenu de tous les analysers (surtout 1.3 predictionDiagnosticAnalyser et 8. XAI)
+
+
+
+
+## A verifier Analysers
+- SequenceClassificationTask : est ce que input_granularity (str) est suffisant pour traiter cas NLI (cas 2 attributs : input = paire premise/hypothesis) + revoir selon ce même principe tous les autres attributs (ou même méthodes) des classes tasks
+- DOCS : préciser que NERTask et l'autre ont étaient supprimés mais leur analysers existent si besoin
+- DOCS : préciser dans la docs plusieurs exemples des tasks qui en découlent sans modification des attributs/ méthodes (NLITask de SequenceClassificationTask, NER et POSTagging de TokenClassification...) + préciser des exemples d'adaptation/surcharge des méthodes
+
+
+
+
+## SI l'overview des analysers validé :
+- bonne pratique code : définir une structure pydantic ?
+- documentation plus claire des visualisations possibles de chaque analyser
+- ajouter tableau binaire + diag de classe (analysers) + heatmap/dendogram // à partir de la doc de NLP analysers overview : (1) générer un diagramme de classe sans attibuts sans méthodes juste de l'héritage et (2) générer un tableau (rows=analysers, cols=tasks) sous format markdown pour représenter la notion de compatible tasks 
+- PS : AJOUTER une ref de topkWordsAnalyser/topkfeatures dans multiclassAnalyser et notre XAIAnalyser avec leur shap (soit en mode compatible task soit à titre informatif) // de manière générale voir si on peut créer des héritage et connexions entre evaldahs existant et notre proposition
+- (opt) ajouter des analysers d'XAI pour le Texte (intégrer idées de bases + cours MJ) 
+
+
+
+
+## Quang discussion : (voir note sur teams) structurer toutes les idées à échanger avec Quang (analysers sous forme de hiérarchie avec diag de classe...)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Design principles
+
+### Héritage : je suis une version spécialisée de mon parent, je réutilise tout ce qu'il définit.
+L'héritage signifie : AbstractiveQAAnalyser est un Seq2SeqAnalyser
+-Il reçoit automatiquement toutes les métriques et visualisations de Seq2SeqAnalyser (BLEU, ROUGE, BERTScore, n-gram overlap heatmap…)
+-Il n'a pas besoin de redéclarer ces métriques dans sa définition
+Il peut les surcharger si besoin (ex. ajuster le calcul de ROUGE pour les réponses courtes)
+-Les compatible tasks sont un sous-ensemble de celles du parent : Seq2SeqAnalyser accepte Seq2SeqTask, MachineTranslationTask, etc. — AbstractiveQAAnalyser n'accepte que AbstractiveQATask
+
+PS : FeatureImportanceAnalyser est abstraite car elle ne définit aucune méthode concrète. PredictionDiagnosticAnalyser est concrète — ses deux enfants partagent la même logique de base (filtrage par confiance).
+
+### Composition : j'utilise un autre analyser comme outil interne, je délègue une partie de mon évaluation.
+La composition signifie : AbstractiveQAAnalyser utilise LLMJudgeAnalyser comme composant interne
+- LLMJudgeAnalyser est instancié comme ATTRIBUT dans AbstractiveQAAnalyser
+- Il est appelé conditionnellement (ici : seulement quand il n'y a pas de référence gold)
+- Les métriques de LLMJudgeAnalyser (faithfulness, relevance…) sont déléguées — AbstractiveQAAnalyser les expose dans ses résultats mais ne les réimplémente pas
+- Les compatible tasks ne fusionnent pas : LLMJudgeAnalyser reste compatible avec ses propres tasks (RagTask, CompletionTask…) indépendamment
+
+
+### Transversalité : je suis composable partout sans aucune dépendance au contexte — je suis un outil générique.
+C'est aussi de la composition (est instancié comme attribut), c'est juste qu'elle décrit le fait qu'un analyser est conçu pour être composé dans n'importe quel contexte compatible. 
+
+
+
+
+---
+
+
+## What is the difference between clustering and topic modeling? 
+
+----------- short answer :
+- `ClusteringNLPTask` :  Focus: grouping by similarity, not extracting thematic content. //eval : mesurer la distance entre documents ou la pureté des groupes.
+
+
+- `TopicModelingTask` :   Focus: discovering topics, not clustering individual texts. //eval : mots dans chaque thème (exp fruité) sont logiques ET si les documents (exp. doc1 « pomme, banane, fraise », doc2 : « pomme, voiture, chaise ») reflètent bien ces thèmes 
+
+
+
+
+
+----------- Long answer :
+
+(source : https://pmc.ncbi.nlm.nih.gov/articles/PMC9040385/)
+Clustering seeks to split documents into a certain number of groups based on a similarity metric. Topic modeling seeks to discover latent topics that describe the collection of documents. A topic represents a group of words that frequently occur together.
+
+### exemple de gpt : 
+Clustering et topic modeling sont conceptuellement différents :
+- Le clustering regroupe les textes selon leur similarité dans l’espace des embeddings ou des features.
+- Le topic modeling identifie des thèmes ou sujets latents qui apparaissent dans le corpus, souvent en associant chaque mot à des topics (comme LDA).
+
+Lien possible : parfois, on peut faire un clustering sur les textes puis analyser chaque cluster avec un topic model pour en extraire les thèmes principaux. Mais ce n’est pas une étape obligatoire ni inhérente au topic modeling.
+Le topic modeling peut fonctionner directement sur le corpus complet, sans clustering préalable.
+Clustering ne fournit pas de “thèmes” en lui-même, juste des regroupements de textes similaires.
+
+En résumé :
+Clustering = mettre les jouets similaires dans le même groupe.
+Topic modeling = trouver les thèmes ou histoires cachés que les jouets racontent quand ils sont ensemble.
+
+### Evaluation : 
+Clustering :On peut mesurer la distance entre documents ou la pureté des groupes. //on vérifie si les documents sont bien groupés.
+Topic modeling : on vérifie si les mots dans chaque thème sont logiques et si les documents reflètent bien ces thèmes.
+
+
+## Eval Dash lib
+- créer des familles plus globales d'analysers dans eval dash (cela inclus les parties de tab data, comme une maille pour l'explicabilité qui inclus l'analysers de shap et celui des topk_features (bruno : topk_words dans multiclassif)
+- je ne peux afficher le tableau analysers x tasks que lorsque je **valide** toutes les fonctions d'analysers et toutes les sous tasks
+

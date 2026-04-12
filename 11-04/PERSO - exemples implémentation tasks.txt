@@ -1,0 +1,510 @@
+## Classes racines et branches abstraites
+
+### `NLPTask` (abstraite) - illustrée via `SequenceClassificationTask`
+
+```python
+# Création d'une instance concrète qui hérite de NLPTask
+sentiment_task = SequenceClassificationTask(
+    task_name="sentiment_analysis",  # Attribut de NLPTask
+    model=transformer_pipeline,       # Attribut de NLPTask
+    label2id={"negative": 0, "neutral": 1, "positive": 2}
+)
+
+# Utilisation de run() - méthode de NLPTask
+result = sentiment_task.run("This product is amazing!")
+# Appelle séquentiellement: preprocess -> model inference -> postprocess
+print(result)  # {"label": "positive", "score": 0.95}
+```
+
+### `NLPDiscriminativeTask` (abstraite) - illustrée via `SequenceClassificationTask`
+
+```python
+# Attributs et méthodes via SequenceClassificationTask
+spam_task = SequenceClassificationTask(
+    task_name="spam_detection",
+    model=sklearn_pipeline,
+    label2id={"ham": 0, "spam": 1}  # Attribut label2id
+)
+
+# predict() - méthode discriminative
+prediction = spam_task.predict("WIN FREE MONEY!!!")
+print(prediction)  # 1 (spam)
+
+# get_labels() - méthode discriminative
+labels = spam_task.get_labels()
+print(labels)  # ["ham", "spam"]
+```
+
+### `NLPGenerativeTask` (abstraite) - illustrée via `CompletionTask`
+
+```python
+# Attributs via CompletionTask
+completion_task = CompletionTask(
+    task_name="code_completion",
+    model=llama_model,
+    max_new_tokens=512,      # Attribut generative
+    temperature=0.7,         # Attribut generative
+    prompt_template="Complete this Python function: {input}"
+)
+
+# generate() - méthode generative
+output = completion_task.generate("def fibonacci(n):")
+print(output)  # "if n <= 1: return n\nelse: return fibonacci(n-1) + fibonacci(n-2)"
+```
+
+### `NLPRepresentationTask` (abstraite) - illustrée via `EmbeddingTask`
+
+```python
+# Attributs via EmbeddingTask
+embedding_task = EmbeddingTask(
+    task_name="sentence_encoder",
+    model=sentence_transformer,
+    representation_dim=768,    # Attribut representation
+    pooling_strategy="mean",
+    normalize=True
+)
+
+# represent() - méthode representation
+vector = embedding_task.represent("Hello world")
+print(vector.shape)  # (768,)
+print(vector[0:5])   # [0.123, -0.456, 0.789, ...]
+```
+
+### `AudioTask` (abstraite) - illustrée via `ASRTask`
+
+```python
+# Attributs via ASRTask
+asr_task = ASRTask(
+    task_name="meeting_transcriber",
+    model=whisper_model,
+    sample_rate=16000,      # Attribut AudioTask
+    audio_format="wav",     # Attribut AudioTask
+    return_timestamps=True
+)
+
+# load_audio() - méthode AudioTask
+audio_array = asr_task.load_audio("meeting.wav")
+print(audio_array.shape)    # (160000,)
+print(audio_array.dtype)    # float32
+```
+
+### `ExtractiveQATask`
+
+```python
+# Création et attributs
+qa_task = ExtractiveQATask(
+    task_name="squad_qa",
+    model=bert_qa_model,
+    context="The Eiffel Tower is located in Paris. It was built in 1889.",
+    question="When was the Eiffel Tower built?"
+)
+
+# extract_span()
+answer = qa_task.extract_span()
+print(answer)  # "1889"
+
+# get_answer_char_positions()
+start, end = qa_task.get_answer_char_positions()
+print(f"Characters {start} to {end}")  # Characters 48 to 52
+print(qa_task.context[start:end])      # "1889"
+```
+
+### `FillMaskTask`
+
+```python
+# Attributs
+fill_task = FillMaskTask(
+    task_name="bert_filler",
+    model=bert_model,
+    mask_token="[MASK]"  # Attribut mask_token
+)
+
+# fill() méthode
+masked_text = "The capital of France is [MASK]."
+candidates = fill_task.fill(masked_text, top_k=3)
+
+for cand in candidates:
+    print(f"{cand['token']}: {cand['score']:.3f}")
+# Paris: 0.892
+# Lyon: 0.043
+# Marseille: 0.021
+```
+
+### `TopicModelingTask`
+
+```python
+# Attributs et fit()
+topic_task = TopicModelingTask(
+    task_name="review_topics",
+    model=lda_model,
+    n_topics=3,          # Attribut
+    n_top_words=5        # Attribut
+)
+
+documents = [
+    "The battery life is amazing",
+    "Screen is too small",
+    "Customer service was unhelpful"
+]
+
+# fit() - retourne self pour chaînage
+topic_task.fit(documents)
+
+# get_topics()
+topics = topic_task.get_topics()
+print(topics[0])  # ['battery', 'life', 'power', 'charge', 'durable']
+print(topics[1])  # ['screen', 'display', 'small', 'size', 'pixel']
+
+# get_doc_topics()
+doc_topic = topic_task.get_doc_topics("The battery drains quickly")
+print(doc_topic)  # {0: 0.85, 1: 0.10, 2: 0.05}
+```
+
+### `ClusteringNLPTask`
+
+```python
+# Attributs et fit()
+cluster_task = ClusteringNLPTask(
+    task_name="feedback_clustering",
+    model=hdbscan_model,
+    n_clusters=None  # Attribut - None pour détection automatique
+)
+
+texts = [
+    "Great product!", "Awesome experience", "Terrible service",
+    "Horrible quality", "Good value", "Excellent support"
+]
+
+# fit() - retourne self
+cluster_task.fit(texts)
+
+# get_cluster_labels()
+labels = cluster_task.get_cluster_labels()
+print(labels)  # [0, 0, 1, 1, 0, 0]  (-1 pour les points bruit)
+```
+
+## Discriminative - Sequence Classification
+
+### `SequenceClassificationTask`
+
+```python
+# predict_proba()
+sentiment_task = SequenceClassificationTask(
+    task_name="sentiment",
+    model=roberta_model,
+    label2id={"neg": 0, "pos": 1}
+)
+
+proba = sentiment_task.predict_proba("I love this!")
+print(proba)  # {"neg": 0.05, "pos": 0.95}
+```
+
+### `NLITask`
+
+```python
+# Attributs spécifiques
+nli_task = NLITask(
+    task_name="fact_checker",
+    model=mnli_model,
+    label2id={"entailment": 0, "contradiction": 1, "neutral": 2},
+    premise="All humans are mortal. Socrates is human.",
+    hypothesis="Socrates is mortal."
+)
+
+# predict() hérité
+result = nli_task.predict()
+print(result)  # "entailment"
+
+# Accès direct aux attributs
+print(nli_task.premise)     # "All humans are mortal..."
+print(nli_task.hypothesis)  # "Socrates is mortal."
+```
+
+## Discriminative - Token Classification
+
+### `TokenClassificationTask`
+
+```python
+# predict() sur tokens
+token_task = TokenClassificationTask(
+    task_name="pos_tagger",
+    model=spacy_model,
+    label2id={"NOUN": 0, "VERB": 1, "ADJ": 2}
+)
+
+tokens = ["The", "quick", "brown", "fox", "jumps"]
+labels = token_task.predict(tokens)
+print(labels)  # ["DET", "ADJ", "ADJ", "NOUN", "VERB"]
+```
+
+### `NERTask`
+
+```python
+# Attributs spécifiques
+ner_task = NERTask(
+    task_name="entity_extractor",
+    model=bert_ner_model,
+    entity_types=["PER", "ORG", "LOC"],  # Attribut
+    label_scheme="BIO"                    # Attribut
+)
+
+tokens = ["John", "works", "at", "Google", "in", "NYC"]
+spans = ner_task.extract_spans(tokens)
+print(spans)
+# [
+#   {"text": "John", "label": "PER", "start": 0, "end": 1},
+#   {"text": "Google", "label": "ORG", "start": 3, "end": 4},
+#   {"text": "NYC", "label": "LOC", "start": 5, "end": 6}
+# ]
+```
+
+### `POSTaggingTask`
+
+```python
+# Attribut tagset
+pos_task = POSTaggingTask(
+    task_name="morpho_tagger",
+    model=ud_model,
+    tagset="universal_dependencies"  # Attribut
+)
+
+# predict() hérité
+tokens = ["She", "runs", "quickly"]
+tags = pos_task.predict(tokens)
+print(tags)  # ["PRON", "VERB", "ADV"]
+```
+
+## Generative - Completion
+
+### `CompletionTask`
+
+```python
+# Attribut prompt_template
+completion_task = CompletionTask(
+    task_name="email_writer",
+    model=gpt_model,
+    max_new_tokens=200,
+    temperature=0.8,
+    prompt_template="Write an email to {recipient} about {subject}"
+)
+
+# complete()
+email = completion_task.complete({
+    "recipient": "my boss",
+    "subject": "project deadline"
+})
+print(email)
+# "Dear Boss, I wanted to update you on the project..."
+```
+
+## Generative - Seq2Seq
+
+### `Seq2SeqTask`
+
+```python
+# encode_decode()
+seq2seq_task = Seq2SeqTask(
+    task_name="paraphraser",
+    model=t5_model,
+    max_new_tokens=128,
+    temperature=0.9
+)
+
+paraphrase = seq2seq_task.encode_decode("The cat sat on the mat")
+print(paraphrase)  # "The feline was resting on the rug"
+```
+
+### `MachineTranslationTask`
+
+```python
+# Attributs et translate()
+mt_task = MachineTranslationTask(
+    task_name="fr_en_translator",
+    model=nllb_model,
+    src_lang="fra_Latn",   # Attribut
+    tgt_lang="eng_Latn"    # Attribut
+)
+
+translation = mt_task.translate("Bonjour le monde")
+print(translation)  # "Hello world"
+```
+
+### `SummarizationTask`
+
+```python
+# Attributs et summarize()
+summary_task = SummarizationTask(
+    task_name="news_summarizer",
+    model=bart_model,
+    max_summary_length=50  # Attribut
+)
+
+long_text = """The company announced record profits for Q3...
+[500 more words]"""
+
+summary = summary_task.summarize(long_text)
+print(summary)  # "Company reports record Q3 profits driven by..."
+```
+
+### `DialogueTask`
+
+```python
+# Attributs et méthodes
+dialogue_task = DialogueTask(
+    task_name="customer_support",
+    model=llama_model,
+    system_prompt="You are a helpful customer support agent",  # Attribut
+    history=[]  # Attribut - liste vide initialement
+)
+
+# respond()
+response1 = dialogue_task.respond("I can't log into my account")
+print(response1)  # "I'm sorry to hear that. Can you provide your email?"
+
+# respond() avec historique
+response2 = dialogue_task.respond("My email is john@example.com")
+print(response2)  # "Thank you John. I've sent a reset link."
+
+# reset_history()
+dialogue_task.reset_history()
+print(dialogue_task.history)  # []
+```
+
+## Generative - Tool-augmented
+
+### `RagTask`
+
+```python
+# Attributs et méthodes
+rag_task = RagTask(
+    task_name="doc_qa",
+    model=llama_model,
+    retriever=dense_retriever,   # Attribut
+    vector_store=faiss_index,    # Attribut
+    top_k_docs=3                 # Attribut
+)
+
+# retrieve()
+passages = rag_task.retrieve("What is RAG?")
+print(passages)  # ["RAG stands for Retrieval-Augmented Generation...", ...]
+
+# generate()
+answer = rag_task.generate("Explain RAG architecture")
+# Appelle retrieve() puis génère
+print(answer)  # "RAG combines a retriever to fetch relevant documents..."
+```
+
+### `AgentTask`
+
+```python
+# Attributs et méthodes
+def web_search(query):
+    return f"Results for {query}"
+
+def calculate(expression):
+    return eval(expression)
+
+agent_task = AgentTask(
+    task_name="research_agent",
+    model=gpt4_model,
+    tools=[web_search, calculate],  # Attribut
+    max_steps=5,                    # Attribut
+    memory=conversation_buffer      # Attribut
+)
+
+# call_tool()
+result = agent_task.call_tool("calculate", {"expression": "2 + 2"})
+print(result)  # 4
+
+# run_agent()
+final_answer = agent_task.run_agent("Find the capital of France and calculate its population * 2")
+print(final_answer)  # "Paris has population 2.1M, doubled is 4.2M"
+```
+
+## Representation
+
+### `EmbeddingTask`
+
+```python
+# Attributs et embed()
+embedding_task = EmbeddingTask(
+    task_name="sentence_embedder",
+    model=mpnet_model,
+    representation_dim=768,
+    pooling_strategy="mean",  # Attribut
+    normalize=True            # Attribut
+)
+
+# embed() - accepte liste de textes
+texts = ["Hello world", "Bonjour le monde", "Hola mundo"]
+embeddings = embedding_task.embed(texts)
+print(embeddings.shape)  # (3, 768)
+
+# Vérifier normalisation
+import numpy as np
+norms = np.linalg.norm(embeddings, axis=1)
+print(norms)  # [1.0, 1.0, 1.0] (normalisés)
+```
+
+## Audio
+
+### `ASRTask`
+
+```python
+# transcribe() avec/sans timestamps
+asr_task = ASRTask(
+    task_name="transcriber",
+    model=whisper_model,
+    sample_rate=16000,
+    audio_format="wav",
+    return_timestamps=True  # Attribut
+)
+
+audio = asr_task.load_audio("speech.wav")
+
+# Avec timestamps
+segments = asr_task.transcribe(audio)
+print(segments[0])  # {"word": "Hello", "start": 0.12, "end": 0.34}
+
+# Sans timestamps
+asr_task.return_timestamps = False
+text = asr_task.transcribe(audio)
+print(text)  # "Hello world how are you today"
+```
+
+### `ASTTask`
+
+```python
+# translate_audio()
+ast_task = ASTTask(
+    task_name="speech_translator",
+    model=seamless_model,
+    src_lang="fra",    # Attribut
+    tgt_lang="eng"     # Attribut
+)
+
+audio = ast_task.load_audio("french_speech.wav")
+translation = ast_task.translate_audio(audio)
+print(translation)  # "Hello, how are you?"
+```
+
+### `TTSTask`
+
+```python
+# synthesize()
+tts_task = TTSTask(
+    task_name="voice_synthesizer",
+    model=tts_model,
+    voice_id="en_us_female_1",      # Attribut
+    output_sample_rate=24000        # Attribut
+)
+
+# synthesize() - retour type dépend de l'implémentation
+audio_output = tts_task.synthesize("Hello, welcome to our service!")
+
+# Peut retourner différents types
+if isinstance(audio_output, np.ndarray):
+    print(f"Raw waveform: {audio_output.shape}")  # (24000,)
+elif isinstance(audio_output, bytes):
+    print(f"Encoded audio: {len(audio_output)} bytes")  # 48000 bytes
+```

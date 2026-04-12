@@ -1,0 +1,294 @@
+# NLP Tasks : Class Overview
+
+---
+
+## Root & branches
+
+- `NLPTask` : abstract root of all tasks. Holds attributes shared across
+  every NLP task.
+  - `task_name: str` : human-readable identifier for the task instance ("sentiment_analysis", "intent_detection", etc).
+  - `model: Any` : underlying model object (transformer, sklearn
+    pipeline, etc.).
+  - `run(input_data) OutputData` : main entry point: calls
+    preprocess step, model inference, then postprocess step in sequence.
+
+
+- `NLPDiscriminativeTask` : abstract branch for tasks that analyse an
+  existing input to extract discrete information (label, span).
+  *Ex: detecting sentiment in a customer review.*
+  - `label2id: Dict[str, int]` : mapping from label names to class
+    indices, shared by all discriminative subclasses.
+
+  - `predict(input_data) Any` : returns the most likely label(s);
+    return type is refined in each subclass.
+  - `predict_proba(input_data) Dict[str, float]` : returns a
+    confidence distribution over labels.
+
+
+
+  - `get_labels() List[str]` : returns the ordered label list derived
+    from `label2id`.
+
+- `NLPGenerativeTask` : abstract branch for tasks that produce new text
+  from an input. *Ex: generating a summary or completing a prompt.*
+  - `max_new_tokens: int` : upper bound on the number of tokens to
+    generate.
+  - `temperature: float` : controls output randomness during sampling.
+  - `generate(input_data) str` : runs the full generative inference
+    pipeline.
+
+
+- `NLPRepresentationTask` : abstract branch for tasks that encode
+  text into a dense numerical vector in a semantic space.
+  *Ex: encoding sentences for semantic search.*
+  - `representation_dim: int` : dimensionality of the output vector.
+
+
+
+- `AudioTask` : abstract branch for tasks whose primary input or output
+  is an audio signal. *Ex: transcribing a phone call.*
+  - `sample_rate: int` : audio sampling frequency in Hz.
+  - `channels: int` : number of audio channels; `1` for mono, `2` for stereo.
+  - `audio_format: str` : file format or encoding (wav, flac, mp3…).
+  - `load_audio(path) ndarray` : loads and normalises an audio file
+    into a float32 array.
+
+- `ExtractiveQATask` : locates and returns a verbatim answer span from
+  a provided context, without generating new text.
+  *Ex: SQuAD-style QA, highlighting the answer directly in a
+  paragraph.*
+ > **_Note:_** For abstractive QA (answer generation), use `Seq2SeqTask` or
+  `CompletionTask` with an appropriate `prompt_template`.
+  - `context: str` : source passage from which the answer is
+    extracted.
+  - `question: str` : natural language question to answer.
+  - `extract_span() str` : returns the single answer span extracted
+    from `self.context` for `self.question`;
+  - `get_answer_char_positions() Tuple[int, int]` : returns the
+    character-level start and end positions of the extracted span
+    within `self.context`.
+
+- `FillMaskTask` : predicts masked tokens in a sentence using masked
+  language modelling. 
+  *Ex: "The capital of France is [MASK]."*
+  - `mask_token: str` : special token marking the position to predict
+    (e.g. `[MASK]`, `<mask>`).
+  - `top_k: int` : number of candidate tokens to return per masked position.
+  - `fill(masked_text) List[Dict[str, Any]]` : returns a ranked
+    list of `{token: str, score: float}` candidates per masked
+    position.
+
+
+- `TopicModelingTask` : discovers latent topics in a corpus without
+  supervision.
+  *Ex: extracting themes such as "delivery" or "product quality"
+  from customer reviews.*
+  - `n_topics: int` : number of topics to learn.
+  - `n_top_words: int` : number of representative words returned
+    per topic.
+  - `fit(documents: List[str]) TopicModelingTask` : trains `model` on the
+  provided corpus and returns `self`.
+  - `get_topics() List[List[str]]` : returns the top words defining
+    each topic.
+  - `get_doc_topics(document) Dict[int, float]` : returns the topic
+    weight distribution `{topic_id: weight}` for a single document.
+
+- `ClusteringNLPTask` : groups similar texts into clusters without
+  predefined labels.
+  *Ex: grouping customer feedback by semantic similarity.*
+  - `n_clusters: Optional[int]` : number of clusters; `None` for
+    density-based algorithms that infer it automatically.
+  - `fit(texts: List[str]) ClusteringNLPTask` : fits `model` on the
+  provided texts and returns `self`.
+  - `get_cluster_labels() List[int]` : returns the cluster index
+    per document; `-1` for noise points (HDBSCAN).
+
+---
+
+## Discriminative : sequence classification
+
+- `SequenceClassificationTask` : assigns a single label to an entire
+  input sequence. 
+  *Ex: spam detection, sentiment analysis
+  (positive/neutral/negative), intent detection
+  (book_flight, cancel_order…). Domain-specific tasks are direct
+  instantiations : no subclass needed.*
+  - `predict(text) str` : overrides parent; returns the most likely
+    label for the input sequence.
+  - `predict_proba(text) Dict[str, float]` : overrides parent;
+    returns a probability distribution over all labels for the input sequence.
+
+- `NLITask` : specialises `SequenceClassificationTask` for natural
+  language inference. Determines whether a hypothesis is entailed,
+  contradicted, or undetermined with respect to a premise. Label space
+  is fixed to {entailment, contradiction, neutral}, populated in
+  `label2id` at initialisation.
+  *Ex: automated fact-checking.*
+  - `premise: str` : reference statement.
+  - `hypothesis: str` : statement to verify against the premise.
+
+---
+
+## Discriminative : token classification
+
+- `TokenClassificationTask` : assigns a label to each token in a
+  sequence. 
+  *Ex: named entity recognition, part-of-speech tagging.*
+  - `predict(tokens) List[str]` : overrides parent; returns a label
+    sequence aligned with the input tokens.
+  - `predict_proba(tokens) List[Dict[str, float]]` : overrides
+    parent; returns a confidence distribution over labels for each
+    token position.
+
+
+- `NERTask` : specialises `TokenClassificationTask` for named entity
+  recognition. *Ex: extracting company names from financial news.*
+  - `entity_types: List[str]` : recognised entity categories
+    (PER, ORG, LOC…); used to populate `label2id` at initialisation
+    according to `label_scheme`.
+  - `label_scheme: str` : span encoding convention applied to
+    `entity_types` when building `label2id`
+    (BIO → B-PER, I-PER…; BIOES → B-PER, I-PER, E-PER, S-PER…).
+  - `extract_spans(tokens) List[Dict[str, Any]]` : reconstructs all
+    contiguous labelled spans from token-level predictions; returns
+    `[{text, label, start, end}]`.
+
+- `POSTaggingTask` : specialises `TokenClassificationTask` for
+  morphosyntactic tagging. 
+  *Ex: tagging words in a parsing pipeline.*
+  - `tagset: str` : tag inventory reference used to populate `label2id`
+    at initialisation (Universal Dependencies, Penn Treebank…).
+
+
+---
+
+## Generative : completion
+
+- `CompletionTask` : generates free-form text from a prompt using
+  autoregressive language modelling.
+  *Ex: code generation
+  (prompt_template context = "python"), style rewriting, etc.*
+  - `prompt_template: str` : template string defining the structure
+    of the input prompt.
+  - `complete(input_data) str` : injects `input_data` into
+    `prompt_template` and returns the generated completion.
+
+---
+
+## Generative : seq2seq
+
+- `Seq2SeqTask` : generates text conditioned on a full source sequence
+  using the encoder-decoder paradigm. 
+  - `encode_decode(source) str` : encodes the source sequence and
+    decodes the output.
+
+- `MachineTranslationTask` : specialises `Seq2SeqTask` for
+  source-to-target language translation.
+  *Ex: translating FR→EN subtitles.*
+  - `src_lang: str` : BCP-47 code of the source language.
+  - `tgt_lang: str` : BCP-47 code of the target language.
+  - `translate(text) str` : returns the translated text.
+
+- `SummarizationTask` : specialises `Seq2SeqTask` for condensing
+  text into a shorter summary.
+  *Ex: summarising financial reports.*
+
+  - `max_summary_length: int` : maximum number of tokens in the
+    output.
+  - `summarize(text) str` : returns the generated or extracted
+    summary.
+
+- `DialogueTask` : specialises `Seq2SeqTask` for multi-turn
+  conversation. Generates the next reply conditioned on the full
+  conversation history.
+  *Ex: multi-turn customer support assistant.*
+  - `history: List[Dict]` : ordered list of past turns as
+    `{role, content}` dicts.
+  - `system_prompt: str` : instruction string defining the
+    assistant's behaviour.
+  - `respond(utterance) str` : appends the user turn to `history`
+    and returns the next reply.
+  - `reset_history()` : clears `history` to start a new
+    conversation.
+
+---
+
+## Generative : tool-augmented
+
+- `RagTask` : retrieves relevant passages from a knowledge base and
+  generates an answer conditioned on them.
+  *Ex: chatbot answering from internal documentation.*
+  - `retriever: Any` : component responsible for scoring and ranking
+    passages (dense, sparse, or hybrid).
+  - `vector_store: Any` : indexed passage store queried by the
+    retriever (e.g. FAISS, Chroma, Elasticsearch).
+  - `top_k_docs: int` : number of passages retrieved per query.
+  - `retrieve(query) List[str]` : returns the top-k most relevant
+    passages.
+  - `generate(query) str` : overrides parent;
+  internally calls `self.retrieve(query)` to fetch relevant passages,
+  then generates an answer conditioned on them.
+
+- `AgentTask` : plans and executes actions in a loop by calling
+  external tools until an objective is reached.
+  *Ex: an agent that searches, compares, and synthesises information
+  from multiple sources.*
+  - `tools: List[Any]` : callable tool objects available to the
+    agent (web search, code executor, calculator…).
+  - `max_steps: int` : maximum number of reasoning/action steps
+    before forced termination.
+  - `memory: Optional[Any]` : optional component for persisting
+    state across steps (conversation buffer, entity memory…).
+  - `run_agent(objective) str` : runs the full agentic loop and
+    returns the final result.
+  - `call_tool(name, args: Dict[str, Any]) Any` : dispatches a
+    single tool call by name and returns the tool output.
+
+---
+
+## Representation
+
+> **_Note:_** `NLPRepresentationTask` is currently implemented by `EmbeddingTask` only.
+> Designed as an extension point for future representation-oriented
+> tasks such as cross-modal embeddings (text + image) or
+> dense document indexing for retrieval.
+
+- `EmbeddingTask` : encodes text into dense vectors in a semantic
+  space. *Ex: encoding sentences to feed a vector search engine.*
+  - `pooling_strategy: str` : aggregation method over token
+    embeddings (mean, cls, max).
+  - `normalize: bool` : whether to L2-normalise output vectors.
+  - `embed(texts: List[str]) ndarray` : returns an embedding matrix
+    of shape `(n_texts, representation_dim)`.
+
+---
+
+## Audio
+
+- `ASRTask` : transcribes audio into text. 
+  *Ex: transcribing Teams meetings.*
+  - `return_timestamps: bool` : whether `transcribe()` returns
+  time-aligned segments `[{word, start, end}]` or plain text.
+  - `transcribe(audio: ndarray) str | List[Dict[str, Any]]` : returns
+  plain text transcription if `return_timestamps` is `False`,
+  or a list of `{word, start, end}` time-aligned segments otherwise.
+
+
+- `ASTTask` : translates spoken audio directly into text in a target
+  language.
+  *Ex: translating a conference talk from French into English.*
+  - `src_lang: str` : BCP-47 code of the spoken source language.
+  - `tgt_lang: str` : BCP-47 code of the target output language.
+  - `translate_audio(audio: ndarray) str` : returns the translated
+    transcript.
+
+- `TTSTask` : synthesises audio from text.
+  *Ex: generating a voice for a virtual assistant.*
+  - `voice_id: str` : identifier of the speaker voice or synthesis
+    style.
+  - `output_sample_rate: int` : sampling rate of the generated
+    audio in Hz.
+  - `synthesize(text) Any` : generates and returns the audio output;
+  return type depends on the underlying model implementation
+  (e.g. `ndarray` for raw waveforms, `bytes` for encoded audio).
+
