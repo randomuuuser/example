@@ -1,0 +1,1708 @@
+# Contexte unifié pour tous les exemples
+**Tâche** : classifier des commentaires de clients (positif/négatif/neutre)  
+**Modèle** : BERT fine-tuné sur des avis produits  
+**Données** : 10 000 commentaires étiquetés (60% positifs, 25% négatifs, 15% neutres)
+
+---
+
+## 1. ClassificationAnalyser
+
+### Métrique 1 : Accuracy
+**Explication intuitive** : L'accuracy est la proportion de prédictions correctes parmi toutes les prédictions. Elle répond à la question : "Dans combien de cas le modèle a-t-il vu juste, tous types de commentaires confondus ?" Une accuracy de 0.85 signifie que sur 100 commentaires, le modèle en classe correctement 85.
+
+**Application concrète** : Sur 2000 commentaires de test, le modèle prédit correctement 1700 étiquettes.
+- **Calcul** : 1700 / 2000 = **0.85** (ou 85%)
+- **Interprétation** : Le modèle est correct dans 85% des cas. Mais attention, si 85% des commentaires sont positifs, un modèle qui prédit toujours "positif" aurait 85% d'accuracy sans rien apprendre → d'où l'importance du F1.
+
+### Métrique 2 : F1 macro
+**Explication intuitive** : Le F1 macro fait la moyenne des F1 de chaque classe, en donnant le même poids à la classe minoritaire qu'à la majoritaire. Il répond : "Comment le modèle performe-t-il en moyenne sur chaque type de commentaire, indépendamment de leur fréquence ?" Un F1 macro de 0.81 signifie que la performance moyenne par classe est de 81%.
+
+**Application concrète** : Après prédiction sur 2000 commentaires de test :
+- Positif : précision 0.92, rappel 0.89 → F1 = 2*(0.92*0.89)/(0.92+0.89) = 0.90
+- Négatif : précision 0.85, rappel 0.80 → F1 = 0.82
+- Neutre : précision 0.72, rappel 0.70 → F1 = 0.71
+
+**Calcul** : (0.90 + 0.82 + 0.71) / 3 = **0.81**
+- **Interprétation** : Le modèle performe très bien sur le positif (90%), bien sur le négatif (82%), mais nettement moins sur le neutre (71%). La moyenne de 81% masque cette disparité.
+
+### Métrique 3 : F1 micro
+**Explication intuitive** : Le F1 micro aggrège tous les vrais positifs, faux positifs et faux négatifs de toutes les classes avant de calculer le F1. Il répond : "Quelle est la performance globale du modèle en considérant chaque prédiction individuelle ?" Il est dominé par les classes majoritaires.
+
+**Application concrète** :
+- Total vrais positifs (somme sur toutes classes) = 1650
+- Total faux positifs = 180
+- Total faux négatifs = 170
+- Précision micro = 1650/(1650+180) = 0.90
+- Rappel micro = 1650/(1650+170) = 0.91
+- **F1 micro** = 2*(0.90*0.91)/(0.90+0.91) = **0.905**
+- **Interprétation** : Le F1 micro (0.905) est plus élevé que le F1 macro (0.81) car la classe majoritaire (positif, 60% des données) performe très bien et tire la moyenne vers le haut.
+
+### Visualisation 1 : Matrice de confusion normalisée
+**Explication intuitive** : Un tableau qui montre, pour chaque classe réelle (lignes), comment les prédictions se répartissent (colonnes). Les valeurs sont des proportions (0 à 1) qui s'additionnent à 1 par ligne. Elle répond : "Quand un commentaire est réellement de classe X, quelle est la probabilité qu'il soit classé comme Y ?"
+
+**Application concrète** :
+```
+            Prédit
+           Pos  Neut  Neg
+Réel Pos  0.88 0.09 0.03
+     Neut 0.15 0.70 0.15
+     Neg  0.04 0.08 0.88
+```
+- **Interprétation ligne par ligne** :
+  - Quand un commentaire est réellement Positif (1ère ligne) : 88% sont bien classés positifs, 9% sont classés neutres (erreur), 3% négatifs.
+  - Quand un commentaire est réellement Neutre (2e ligne) : seulement 70% sont bien classés neutres ; 15% sont classés positifs, 15% négatifs → la classe neutre est très ambigüe.
+  - Quand un commentaire est réellement Négatif (3e ligne) : 88% bien classés, 8% neutres, 4% positifs.
+
+### Visualisation 2 : Per-label F1 bar chart
+**Explication intuitive** : Un graphique à barres montrant le F1 de chaque classe individuellement. Il permet de voir d'un coup d'œil quelles classes posent problème.
+
+**Application concrète** :
+- Barre Positif : hauteur 0.90 (verte)
+- Barre Négatif : hauteur 0.82 (orange)
+- Barre Neutre : hauteur 0.71 (rouge)
+- **Interprétation** : Visualisation immédiate que la classe "Neutre" est le maillon faible. On peut décider d'investiguer pourquoi (ambiguïté sémantique, déséquilibre, etc.)
+
+---
+
+### 1.1 SequenceClassificationAnalyser
+
+#### Métrique 1 : ROC-AUC (One-vs-Rest)
+**Explication intuitive** : L'AUC mesure la capacité du modèle à séparer une classe donnée de toutes les autres, quel que soit le seuil de décision choisi. Une AUC de 0.94 signifie que si on prend aléatoirement un commentaire positif et un commentaire non-positif, le modèle donnera un score plus élevé au positif dans 94% des cas.
+
+**Application concrète** : Pour la classe "positif"
+- On calcule pour chaque seuil de probabilité le Taux de Vrais Positifs vs. Taux de Faux Positifs.
+- L'aire sous cette courbe = **0.94**
+- **Interprétation** : Excellent pouvoir discriminant. Le modèle distingue très bien les commentaires positifs des autres.
+
+#### Métrique 2 : Expected Calibration Error (ECE)
+**Explication intuitive** : L'ECE mesure l'écart moyen entre la confiance annoncée par le modèle et sa précision réelle. Un ECE de 0.03 signifie qu'en moyenne, la confiance prédite diffère de la précision réelle de 3 points de pourcentage. Plus l'ECE est proche de 0, mieux le modèle est calibré.
+
+**Application concrète** :
+- Regroupement par déciles de confiance prédite (0-10%, 10-20%, ...)
+- Décile 90-100% : confiance moyenne prédite = 0.94, précision réelle = 0.89
+- Écart = 0.05 pour ce décile
+- Moyenne des écarts sur tous les déciles = **0.03**
+- **Interprétation** : Le modèle est bien calibré. Quand il dit "je suis sûr à 94%", il a raison dans 89% des cas → léger sur-confiance (3 points d'écart en moyenne).
+
+#### Visualisation 1 : Normalised confusion matrix (déjà vu ci-dessus)
+
+#### Visualisation 2 : Predicted probability distribution per class
+**Explication intuitive** : Un histogramme qui montre, pour chaque classe, comment se distribuent les probabilités prédites par le modèle (de 0 à 1). Cela permet de voir si le modèle est sûr de lui ou hésitant.
+
+**Application concrète** : Pour la classe "positif" :
+- Histogramme bimodal : pic à 0.05-0.15 (commentaires clairement non-positifs) et pic à 0.85-0.98 (commentaires clairement positifs)
+- Très peu de probabilités entre 0.3 et 0.7
+- **Interprétation** : Le modèle est rarement indécis sur la classe positive. Il sépare bien le positif du non-positif.
+
+#### Visualisation 3 : Per-label precision/recall/F1 bar chart
+**Explication intuitive** : Un graphique à barres groupées montrant pour chaque classe la précision (des prédictions de cette classe, combien sont correctes), le rappel (des vrais éléments de cette classe, combien sont trouvés) et le F1 (moyenne harmonique des deux).
+
+**Application concrète** :
+```
+Classe    Précision  Rappel    F1
+Positif   0.92       0.89      0.90
+Négatif   0.85       0.80      0.82
+Neutre    0.72       0.70      0.71
+```
+- **Interprétation** : Pour le neutre, la précision (72%) signifie que quand le modèle prédit "neutre", il a raison dans 72% des cas. Le rappel (70%) signifie que sur tous les vrais neutres, le modèle en trouve 70%. Les deux sont faibles → le modèle sous-performe systématiquement sur cette classe.
+
+#### Visualisation 4 : Reliability diagram (calibration curve)
+**Explication intuitive** : Un graphique qui compare la confiance prédite (axe X) à la précision réelle (axe Y). La diagonale représente une calibration parfaite. Les écarts à la diagonale montrent où le modèle est sur-confiant (points sous la diagonale) ou sous-confiant (points au-dessus).
+
+**Application concrète** :
+- 10 bins de 0 à 1
+- Bin [0.9-1.0] : confiance moyenne prédite = 0.94, précision réelle = 0.89 → point sous la diagonale
+- Bin [0.5-0.6] : confiance moyenne prédite = 0.55, précision réelle = 0.58 → point au-dessus de la diagonale
+- **Interprétation** : Le modèle est légèrement sur-confiant pour ses prédictions les plus sûres, et légèrement sous-confiant pour ses prédictions moyennement sûres.
+
+---
+
+### 1.1.1 NLIAnalyser
+
+#### Métrique 1 : Per-relation F1
+**Explication intuitive** : Pour chaque relation (entailment, contradiction, neutral), le F1 mesure comment le modèle reconnaît cette relation spécifique. Un F1 de 0.73 pour "neutral" signifie que la détection des paires sans relation implicative est médiocre.
+
+**Application concrète** (inférence naturelle sur des paires commentaire-règle) :
+- Entailment (le commentaire implique la règle) : F1 = 0.87
+- Contradiction : F1 = 0.82
+- Neutral : F1 = 0.73
+- **Interprétation** : Le modèle excelle à détecter quand un commentaire implique une règle (87%) et quand il la contredit (82%), mais il a du mal avec les cas où il n'y a ni implication ni contradiction (73%).
+
+#### Métrique 2 : Label frequency bias
+**Explication intuitive** : Cette métrique compare la distribution des prédictions à la distribution réelle des classes. Un écart de +9 points pour "contradiction" signifie que le modèle prédit cette relation 9% plus souvent qu'elle n'apparaît réellement.
+
+**Application concrète** :
+- Distribution gold (réelle) : Entailment=45%, Contradiction=22%, Neutral=33%
+- Distribution prédite : Entailment=40%, Contradiction=31%, Neutral=29%
+- Biais = prédit - gold = [-5%, +9%, -4%]
+- **Interprétation** : Le modèle a un fort biais vers la contradiction (9 points de trop) et un biais négatif vers le neutral (4 points de moins). Il sur-prédit les contradictions.
+
+#### Visualisation 1 : Per-relation confusion matrix
+**Explication intuitive** : Une matrice 3x3 qui montre, pour chaque relation réelle (lignes), comment les prédictions se répartissent (colonnes).
+
+**Application concrète** :
+```
+           Prédit
+           Ent  Cont  Neut
+Réel Ent   0.85 0.08 0.07
+     Cont  0.06 0.82 0.12
+     Neut  0.10 0.17 0.73
+```
+- **Interprétation** : Les neutres réels sont confondus avec entailment (10%) et surtout contradiction (17%). Cela explique le biais : le modèle transforme les neutres en contradictions.
+
+#### Visualisation 2 : Predicted vs. gold label distribution bar chart
+**Explication intuitive** : Un graphique à barres côte à côte montrant la proportion de chaque classe dans les données réelles (gold) vs. dans les prédictions.
+
+**Application concrète** :
+- Deux barres par classe (gold en bleu, prédit en orange)
+- Entailment : 45% gold vs. 40% prédit (orange plus basse)
+- Contradiction : 22% gold vs. 31% prédit (orange plus haute)
+- Neutral : 33% gold vs. 29% prédit (orange plus basse)
+- **Interprétation** : Visualisation immédiate du biais : la barre orange de "contradiction" dépasse nettement la barre bleue.
+
+---
+
+### 1.2 TokenClassificationAnalyser
+
+#### Métrique 1 : Token-level accuracy
+**Explication intuitive** : Proportion de tokens (mots ou sous-mots) correctement étiquetés. Une accuracy de 0.91 signifie que sur 100 tokens, 91 reçoivent le bon tag.
+
+**Application concrète** : Annotation des mentions de produits sur 5000 tokens.
+- Tokens correctement taggés = 4550
+- **Token-level accuracy** = 4550/5000 = **0.91**
+- **Interprétation** : 9% des tokens sont mal taggés. Mais cette métrique masque les erreurs de tagging (confondre B-PRODUCT et I-PRODUCT).
+
+#### Métrique 2 : Per-label F1
+**Explication intuitive** : Pour chaque type de tag (B-PRODUCT, I-PRODUCT, O), le F1 mesure la performance du modèle sur ce tag spécifique. Un F1 de 0.92 pour B-PRODUCT signifie que le modèle identifie très bien les débuts d'entités.
+
+**Application concrète** :
+- B-PRODUCT (début d'entité produit) : précision 0.94, rappel 0.91 → F1 = 0.92
+- I-PRODUCT (interne d'entité) : précision 0.89, rappel 0.87 → F1 = 0.88
+- O (hors entité) : précision 0.96, rappel 0.97 → F1 = 0.965
+- **Interprétation** : Le modèle performe très bien sur les tokens hors entité (96.5%), un peu moins sur les tokens internes (88%), ce qui est normal car les entités sont plus rares.
+
+#### Visualisation 1 : Per-tag confusion matrix
+**Explication intuitive** : Une matrice montrant pour chaque tag réel (lignes) la distribution des tags prédits (colonnes). Elle révèle quelles paires de tags sont souvent confondues.
+
+**Application concrète** :
+```
+              B-PROD  I-PROD  O
+B-PROD réel    0.91   0.05   0.04
+I-PROD réel    0.07   0.88   0.05
+O réel         0.01   0.01   0.98
+```
+- **Interprétation** : 5% des B-PROD sont prédits comme I-PROD (erreur de tagging) et 7% des I-PROD comme B-PROD. Le modèle confond parfois la frontière entre début et continuation d'entité.
+
+#### Visualisation 2 : Per-label F1 bar chart
+**Explication intuitive** : Un graphique à barres montrant le F1 de chaque tag, permettant d'identifier d'un coup d'œil les tags problématiques.
+
+**Application concrète** :
+- Barre B-PROD : 0.92 (vert)
+- Barre I-PROD : 0.88 (orange)
+- Barre O : 0.965 (vert foncé)
+- **Interprétation** : I-PROD est le maillon faible (F1=0.88). Les efforts d'amélioration devraient se concentrer sur la détection des tokens internes d'entités.
+
+---
+
+### 1.2.1 NERAnalyser
+
+#### Métrique 1 : Span-level precision/recall/F1
+**Explication intuitive** : Au lieu d'évaluer token par token, on évalue l'entité complète (span). Un span est correct seulement si tous ses tokens sont corrects. Un F1 span-level de 0.85 signifie que 85% des entités sont parfaitement reconnues (type + frontières exactes).
+
+**Application concrète** : Entité "très longue batterie" (3 tokens)
+- Span gold : tokens [12,13,14]
+- Span prédit : tokens [12,13,14] → match parfait
+- Sur 200 entités : 170 parfaitement reconnues → **F1 span-level = 0.85**
+- **Interprétation** : 15% des entités ont au moins une erreur (frontière incorrecte ou type faux).
+
+#### Métrique 2 : Partial match F1
+**Explication intuitive** : Une entité partiellement correcte (ex: gold sur 3 tokens, prédit sur 2 des 3) reçoit un score partiel. Cette métrique est plus indulgente que le span-level F1. Un partial match F1 de 0.92 signifie que même si les entités ne sont pas parfaites, elles se rapprochent souvent de la vérité.
+
+**Application concrète** :
+- Gold : [12,13,14] (3 tokens), Prédit : [12,13] (2 tokens) → match partiel (2/3 = 0.67)
+- Moyenne sur toutes les entités du score de chevauchement = **0.92**
+- **Interprétation** : Bien que seulement 85% des entités soient parfaites, 92% ont un chevauchement substantiel avec la vérité. Les erreurs sont souvent mineures (quelques tokens manqués en fin d'entité).
+
+#### Métrique 3 : Boundary error rate
+**Explication intuitive** : Proportion d'entités où le modèle se trompe sur la position exacte du début ou de la fin (décalage de tokens). Un taux de 0.12 signifie que 12% des entités ont une frontière décalée.
+
+**Application concrète** :
+- Sur 200 entités, 24 ont un décalage de début ou fin
+- **Boundary error rate** = 24/200 = **0.12**
+- **Interprétation** : 12% des entités ont une frontière erronée. La plupart des erreurs sont des décalages de ±1 token.
+
+#### Visualisation 1 : Per-entity-type F1 bar chart
+**Explication intuitive** : Un graphique à barres montrant le F1 pour chaque type d'entité (PRODUIT, MARQUE, CARACTÉRISTIQUE, etc.).
+
+**Application concrète** :
+- PRODUIT : F1 = 0.88
+- MARQUE : F1 = 0.92
+- CARACTÉRISTIQUE : F1 = 0.76
+- **Interprétation** : Les caractéristiques ("batterie", "écran", "autonomie") sont beaucoup moins bien reconnues (76%) que les produits (88%) ou marques (92%). Les caractéristiques sont plus variables et moins standardisées.
+
+#### Visualisation 2 : Boundary error heatmap
+**Explication intuitive** : Une matrice montrant la distribution des décalages de frontières (gold_start - pred_start). Elle révèle si le modèle a tendance à commencer trop tôt ou trop tard.
+
+**Application concrète** : Matrice des décalages (gold_start - pred_start) pour le début d'entité :
+```
+      -2  -1   0  +1  +2
+-2    0   0   2   1   0
+-1    1   3  15   4   1
+ 0    2  18 210  12   3
++1    0   5  14   8   2
+```
+- Cellule (0,0) = 210 entités parfaitement alignées (décalage 0)
+- Cellules (0,+1) = 12 entités où gold_start = pred_start + 1 (le modèle commence 1 token trop tard)
+- Cellules (-1,0) = 15 entités où gold_start = pred_start - 1 (le modèle commence 1 token trop tôt)
+- **Interprétation** : Les erreurs principales sont des décalages de +1 (12 cas) ou -1 (15 cas). Le modèle n'a pas de biais directionnel marqué.
+
+---
+
+### 1.2.2 POSTaggingAnalyser
+
+#### Métrique 1 : Overall accuracy
+**Explication intuitive** : Proportion de tokens (mots) dont le tag grammatical (nom, verbe, adjectif, etc.) est correct. Une accuracy de 0.94 signifie que sur 100 mots, 94 reçoivent le bon tag.
+
+**Application concrète** : Sur 10 000 tokens taggés
+- Tokens corrects = 9400
+- **Overall accuracy** = 0.94
+- **Interprétation** : Le modèle se trompe sur 6% des mots. Performance solide.
+
+#### Métrique 2 : OOV token accuracy
+**Explication intuitive** : Accuracy spécifiquement sur les mots que le modèle n'a jamais vus pendant l'entraînement. Un écart OOV vs. seen révèle la capacité de généralisation. Une OOV accuracy de 0.67 signifie que sur les mots nouveaux, le modèle n'est correct que dans 67% des cas.
+
+**Application concrète** :
+- Tokens vus dans l'entraînement : 94% accuracy
+- Tokens OOV (ex: "cryptomonnaie", "influenceur", "décarbonation") : 67% accuracy
+- **Interprétation** : Chute de 27 points sur les mots nouveaux. Le modèle a mémorisé les patterns lexicaux plutôt qu'appris des règles grammaticales robustes.
+
+#### Métrique 3 : Accuracy stratified by sentence length
+**Explication intuitive** : On découpe les phrases par longueur (en mots) et on calcule l'accuracy pour chaque groupe. Cela révèle si le modèle s'effondre sur les longues phrases.
+
+**Application concrète** :
+- Phrases 5-10 mots : accuracy = 0.94
+- Phrases 10-20 mots : accuracy = 0.91
+- Phrases 20-30 mots : accuracy = 0.85
+- Phrases 30-40 mots : accuracy = 0.78
+- Phrases 40+ mots : accuracy = 0.67
+- **Interprétation** : Le modèle maintient une bonne performance jusqu'à 20 mots, puis dégrade progressivement. Au-delà de 40 mots, l'accuracy chute à 67% (problème de contexte long).
+
+#### Métrique 4 : Accuracy stratified by grammatical category
+**Explication intuitive** : On calcule l'accuracy séparément pour chaque catégorie grammaticale (noms, verbes, adjectifs, adverbes, déterminants, etc.). Cela identifie quelles catégories posent problème.
+
+**Application concrète** :
+- Déterminants ("le", "la", "un") : accuracy = 0.98
+- Noms : accuracy = 0.92
+- Verbes : accuracy = 0.89
+- Adjectifs : accuracy = 0.85
+- Adverbes : accuracy = 0.76
+- **Interprétation** : Les adverbes sont le point faible (76% seulement). Les adverbes sont souvent ambigus (ex: "bien" peut être adverbe ou nom) et moins fréquents.
+
+#### Visualisation 1 : Tag frequency distribution
+**Explication intuitive** : Un histogramme montrant la fréquence de chaque tag dans les données (gold). Cela permet de voir le déséquilibre des classes.
+
+**Application concrète** :
+- NOUN : 25% des tokens
+- VERB : 18%
+- ADJ : 12%
+- ADP (préposition) : 10%
+- DET : 9%
+- ADV : 5%
+- (autres tags plus rares)
+- **Interprétation** : Les adverbes ne représentent que 5% des tokens. Leur faible fréquence explique en partie leur faible F1 (manque d'exemples).
+
+#### Visualisation 2 : Accuracy vs. sentence length curve
+**Explication intuitive** : Une courbe montrant l'accuracy en fonction de la longueur de la phrase. Elle permet de détecter visuellement un seuil de dégradation.
+
+**Application concrète** :
+- Axe X : longueur de phrase (0 à 60 mots)
+- Axe Y : accuracy
+- Courbe plate jusqu'à 20 mots (≈0.93), puis pente négative progressive, puis chute brutale après 45 mots
+- **Interprétation** : Le seuil de performance est à 25 mots. Pour les tâches nécessitant des phrases longues, il faut entraîner sur plus d'exemples longs ou utiliser un modèle avec plus de capacité contextuelle.
+
+#### Visualisation 3 : Per-grammatical-category accuracy bar chart
+**Explication intuitive** : Un graphique à barres montrant l'accuracy pour chaque catégorie grammaticale, permettant d'identifier visuellement les catégories problématiques.
+
+**Application concrète** :
+- Barre DET : 0.98 (vert foncé)
+- Barre NOUN : 0.92 (vert clair)
+- Barre VERB : 0.89 (jaune)
+- Barre ADJ : 0.85 (orange)
+- Barre ADV : 0.76 (rouge)
+- **Interprétation** : Impact visuel immédiat : la barre des adverbes est nettement plus basse. Priorité d'amélioration : les adverbes.
+
+---
+
+### 1.3 PredictionDiagnosticAnalyser
+
+#### Métrique 1 : Prediction entropy
+**Explication intuitive** : L'entropie mesure l'incertitude du modèle sur sa prédiction. Plus l'entropie est élevée (max = log2(n_classes) ≈ 1.58 pour 3 classes), plus le modèle est indécis. Une entropie de 1.03 est élevée (sur une échelle de 0 à 1.58), signifiant une forte incertitude.
+
+**Application concrète** : Commentaire "Le produit est correct sans plus"
+- Distribution : [positif=0.45, neutre=0.40, négatif=0.15]
+- Calcul : -[0.45*log2(0.45) + 0.40*log2(0.40) + 0.15*log2(0.15)]
+- = -[0.45*(-1.15) + 0.40*(-1.32) + 0.15*(-2.74)]
+- = -[-0.52 -0.53 -0.41] = 1.46 bits (sur max 1.58)
+- **Interprétation** : Le modèle est très incertain (1.46/1.58 ≈ 92% de l'entropie maximale). Il hésite entre positif (45%) et neutre (40%).
+
+#### Métrique 2 : Confidence gap between top-2 classes
+**Explication intuitive** : La différence de probabilité entre la classe prédite (1ère) et la 2ème classe. Un petit écart signifie que le modèle hésite entre deux classes. Un écart de 0.05 signifie qu'il n'y a que 5 points de pourcentage de différence entre les deux premières classes.
+
+**Application concrète** : Même commentaire "Le produit est correct sans plus"
+- Top-1 = positif (0.45), Top-2 = neutre (0.40)
+- **Confidence gap** = 0.45 - 0.40 = **0.05**
+- **Interprétation** : Écart très faible (5 points). Le modèle est pratiquement aussi sûr du neutre que du positif. C'est un cas typique d'incertitude.
+
+#### Métrique 3 : Per-class error rate at high-confidence threshold
+**Explication intuitive** : On regarde uniquement les prédictions où le modèle est très confiant (ex: confiance > 0.9), et on calcule le taux d'erreur par classe. Cela révèle si le modèle est "sûr de se tromper" sur certaines classes. Un taux d'erreur de 0.15 pour le neutre signifie que quand le modèle prédit "neutre" avec >90% de confiance, il a tort dans 15% des cas.
+
+**Application concrète** :
+- Confiance > 0.9, classe Positif : 2% d'erreur
+- Confiance > 0.9, classe Négatif : 3% d'erreur
+- Confiance > 0.9, classe Neutre : 15% d'erreur
+- **Interprétation** : Quand le modèle est très confiant sur le neutre, il se trompe encore dans 15% des cas. C'est grave : le modèle est victime d'illusions de compétence sur cette classe.
+
+#### Visualisation 1 : Confidence score distribution (correct vs. wrong predictions overlaid)
+**Explication intuitive** : Un histogramme superposé montrant la distribution des scores de confiance pour les prédictions correctes (une couleur) et les prédictions erronées (une autre couleur). Cela permet de voir si les erreurs surviennent plutôt à basse ou haute confiance.
+
+**Application concrète** :
+- Histogramme superposé :
+  - Prédictions correctes : pic à 0.92-0.98 (confiance élevée)
+  - Prédictions erronées : distribution bimodale avec pics à 0.55 et 0.85
+- **Interprétation** : La plupart des erreurs à haute confiance (pic à 0.85) sont très dangereuses car le modèle est sûr de lui mais faux. Le second pic à 0.55 correspond aux cas d'incertitude normale.
+
+#### Visualisation 2 : Entropy histogram across the dataset
+**Explication intuitive** : Un histogramme montrant la distribution de l'entropie sur tout le dataset. Il révèle la proportion d'exemples pour lesquels le modèle est incertain.
+
+**Application concrète** :
+- Axe X : entropie (0 à 1.58)
+- Axe Y : nombre d'exemples
+- Pic à 0.1-0.3 (très certain) : 70% des données
+- Queue jusqu'à 1.5 : 5% des données avec entropie > 1.5
+- **Interprétation** : La majorité des exemples sont traités avec certitude, mais 5% des données (500 commentaires) sont très incertains. Ces 500 cas sont des candidats pour une re-annotation ou un apprentissage actif.
+
+---
+
+### 1.3.1 VeryWrongPredictionAnalyser
+
+#### Métrique 1 : Confidence score at wrong prediction
+**Explication intuitive** : Pour chaque prédiction erronée, on enregistre le score de confiance du modèle (probabilité attribuée à la mauvaise classe). Un score de 0.96 signifie que le modèle était extrêmement sûr de sa réponse... qui était fausse.
+
+**Application concrète** : Top-3 des erreurs à haute confiance
+1. "Excellent produit, je recommande" → prédit Négatif avec confiance 0.96 → réel Positif
+2. "Déçu, ne fonctionne pas" → prédit Positif avec confiance 0.94 → réel Négatif
+3. "Correct" → prédit Positif avec confiance 0.91 → réel Neutre
+
+- **Interprétation** : Le modèle est parfois "sûr de se tromper" de manière spectaculaire (confiance > 0.9 sur la mauvaise classe). Ces cas sont prioritaires pour l'analyse.
+
+#### Métrique 2 : Per-class high-confidence error rate
+**Explication intuitive** : Parmi les prédictions très confiantes (>0.9) pour une classe donnée, quelle proportion est erronée ? Un taux de 0.15 pour le neutre signifie que 15% des prédictions "neutre" avec haute confiance sont fausses.
+
+**Application concrète** (déjà vue plus haut) :
+- Positif (conf>0.9) : erreur = 2%
+- Négatif (conf>0.9) : erreur = 3%
+- Neutre (conf>0.9) : erreur = 15%
+- **Interprétation** : La classe neutre concentre les "very wrong predictions". C'est un signal fort que la définition de "neutre" est peut-être ambiguë.
+
+#### Visualisation 1 : Ranked table of top-k errors
+**Explication intuitive** : Un tableau trié par confiance décroissante montrant pour chaque erreur : le texte, la prédiction, la vérité terrain, et la confiance. C'est l'outil principal pour l'audit manuel.
+
+**Application concrète** :
+| Commentaire | Prédit | Réel | Confiance |
+|-------------|--------|------|-----------|
+| "Super ! À acheter les yeux fermés" | Négatif | Positif | 0.98 |
+| "Déception totale, produit inutile" | Positif | Négatif | 0.97 |
+| "Ça va" | Positif | Neutre | 0.96 |
+| "Bof" | Positif | Neutre | 0.95 |
+| "Correct sans plus" | Positif | Neutre | 0.94 |
+
+- **Interprétation** : Les erreurs les plus confiantes concernent toutes la classe neutre (sauf les deux premières). En inspectant "Ça va", on voit que c'est subjectif : pour certains c'est neutre, pour d'autres c'est positif → problème de gold label.
+
+#### Visualisation 2 : Confidence distribution of errors vs. correct predictions
+**Explication intuitive** : Un graphique montrant les histogrammes de confiance pour les erreurs (une couleur) et les prédictions correctes (autre couleur), superposés. Cela complète la visualisation de 1.3.
+
+**Application concrète** :
+- Courbe des corrects : pic aigu à 0.95
+- Courbe des erreurs : bosse à 0.55 (incertitude) ET bosse à 0.85 (haute confiance)
+- **Interprétation** : La bosse à 0.85 est anormale. Dans un modèle bien calibré, les erreurs à très haute confiance devraient être rarissimes. C'est un problème.
+
+---
+
+### 1.3.2 UnsurePredictionAnalyser
+
+#### Métrique 1 : Prediction entropy (identique à 1.3)
+
+#### Métrique 2 : Confidence gap between top-2 classes (identique à 1.3)
+
+#### Visualisation 1 : Ranked table of top-k uncertain examples
+**Explication intuitive** : Un tableau montrant les exemples où l'entropie est la plus élevée (modèle le plus incertain), avec la distribution complète des probabilités. Utile pour l'apprentissage actif (quels exemples annoter en priorité ?).
+
+**Application concrète** :
+| Commentaire | Positif | Neutre | Négatif | Entropie |
+|-------------|---------|--------|---------|----------|
+| "bof" | 0.34 | 0.34 | 0.32 | 1.58 |
+| "moyen" | 0.35 | 0.35 | 0.30 | 1.57 |
+| "correct" | 0.40 | 0.38 | 0.22 | 1.52 |
+| "pas mal" | 0.45 | 0.40 | 0.15 | 1.46 |
+| "acceptable" | 0.42 | 0.43 | 0.15 | 1.48 |
+
+- **Interprétation** : Ces commentaires courts et ambigus sont ceux où le modèle est le plus incertain. Si on veut améliorer le modèle, annoter ces 5% d'exemples incertains rapportera plus que d'ajouter des exemples faciles.
+
+#### Visualisation 2 : Entropy distribution across the dataset (identique à 1.3)
+
+---
+
+## 2. GenerationAnalyser
+
+### Métrique 1 : BLEU
+**Explication intuitive** : BLEU mesure le chevauchement de n-grammes (séquences de n mots) entre le texte généré et la référence. Un score BLEU de 0.45 signifie que le texte généré partage 45% des n-grammes de la référence (pondéré). BLEU est surtout utilisé en traduction automatique.
+
+**Application concrète** : Résumé généré vs. référence (tâche de résumé)
+- Généré : "Le produit est de bonne qualité"
+- Référence : "Ce produit présente une qualité satisfaisante"
+- Calcul BLEU-4 (moyenne des précisions sur unigrammes à 4-grammes) = **0.42**
+- **Interprétation** : Les résumés générés partagent 42% des n-grammes avec les références. C'est modéré, mais BLEU pénalise les synonymes ("bonne" vs "satisfaisante").
+
+### Métrique 2 : ROUGE-{1,2,L}
+**Explication intuitive** : ROUGE mesure le rappel des n-grammes (contrairement à BLEU qui mesure la précision). ROUGE-L regarde la plus longue sous-séquence commune. Un ROUGE-1 de 0.65 signifie que 65% des unigrammes de la référence sont présents dans le généré.
+
+**Application concrète** : Même exemple
+- ROUGE-1 (unigrammes) : 0.65
+- ROUGE-2 (bigrammes) : 0.48
+- ROUGE-L (plus longue séquence) : 0.60
+- **Interprétation** : Le généré capture bien les mots clés (65% des unigrammes de la référence) mais moins bien les séquences de deux mots (48%). La plus longue séquence commune est "qualité" (un seul mot) car les structures sont différentes.
+
+### Métrique 3 : BERTScore
+**Explication intuitive** : BERTScore utilise des embeddings contextuels pour mesurer la similarité sémantique, pas seulement lexicale. Un BERTScore de 0.90 signifie que le généré et la référence sont très proches en termes de sens, même s'ils n'utilisent pas les mêmes mots.
+
+**Application concrète** : Même exemple
+- Généré : "Le produit est de bonne qualité"
+- Référence : "Ce produit présente une qualité satisfaisante"
+- BERTScore F1 = **0.90** (beaucoup plus élevé que BLEU=0.42)
+- **Interprétation** : Sémantiquement, les deux phrases sont très proches. BLEU sous-estime la qualité car il ne comprend pas les synonymes. BERTScore est plus adapté pour la génération en langue naturelle.
+
+#### Visualisation 1 : Score distribution histogram
+**Explication intuitive** : Un histogramme montrant la distribution des scores BLEU/ROUGE/BERTScore sur l'ensemble des exemples. On voit la dispersion et si la performance est homogène.
+
+**Application concrète** : Histogramme BERTScore sur 1000 résumés
+- Moyenne = 0.88, médiane = 0.89, écart-type = 0.07
+- Queue à gauche : 5% des résumés avec BERTScore < 0.75
+- **Interprétation** : La plupart des résumés sont bons (autour de 0.89), mais 5% sont médiocres (<0.75). Ces mauvais résumés sont à analyser manuellement.
+
+#### Visualisation 2 : Generated vs. reference length scatter plot
+**Explication intuitive** : Nuage de points où chaque point est un exemple, avec en X la longueur du texte généré, en Y la longueur de la référence. La diagonale y=x représente l'égalité parfaite.
+
+**Application concrète** :
+- Nuage de points : majorité des points autour de la diagonale y=x
+- Pour les résumés courts (30-50 tokens) : bien alignés
+- Pour les résumés longs (80+ tokens) : points sous la diagonale → le modèle génère des résumés trop courts par rapport à la référence
+- **Interprétation** : Le modèle a tendance à trop condenser les textes longs, perdant de l'information.
+
+---
+
+### 2.1 Seq2SeqAnalyser
+
+#### Métrique 1 : METEOR
+**Explication intuitive** : METEOR améliore BLEU en tenant compte des synonymes, des racines de mots (stemming), et de l'ordre des mots. Un score METEOR de 0.68 signifie une bonne correspondance sémantique, supérieure à ce que suggère BLEU.
+
+**Application concrète** : Même exemple traduction
+- BLEU = 0.42, METEOR = **0.68**
+- **Interprétation** : METEOR est plus élevé car il reconnaît que "bonne" et "satisfaisante" sont sémantiquement proches (via WordNet ou synonymes).
+
+#### Métrique 2 : chrF
+**Explication intuitive** : chrF opère au niveau des caractères (n-grammes de caractères), ce qui le rend robuste aux langues à morphologie riche et aux fautes d'orthographe mineures. Un chrF de 0.83 signifie que les séquences de caractères se chevauchent à 83%.
+
+**Application concrète** : Traduction commentaire "génial" → anglais
+- Référence : "awesome" (6 caractères)
+- Prédit : "great" (5 caractères)
+- chrF (n=6) = F1 sur les n-grammes de caractères
+  - Unigrammes : "a","w","e","s","o","m" vs "g","r","e","a","t" → chevauchement sur "e","a" → 2/6 ≈ 0.33
+  - Mais chrF utilise plusieurs n et une moyenne pondérée → score final **0.83** (car les bigrammes "aw","we"... sont différents)
+- **Interprétation** : chrF est plus indulgent que BLEU : "great" et "awesome" partagent des caractères communs ("e","a") mais sont différents. En pratique, pour la traduction, chrF est un bon complément.
+
+#### Visualisation 1 : Score distribution histogram (déjà vu)
+
+#### Visualisation 2 : Source vs. target length scatter plot
+**Explication intuitive** : Pour chaque paire (source, généré), on plotte la longueur de la source (X) et la longueur du généré (Y). La pente de la régression indique le taux de compression/expansion.
+
+**Application concrète** : Tâche de résumé
+- Source (commentaire client) : longueur moyenne = 120 mots
+- Généré (résumé) : longueur moyenne = 35 mots
+- Pente de la régression = 0.29
+- **Interprétation** : Le modèle résume avec un facteur de compression moyen de 0.29. Pour une source de 200 mots, le résumé fait environ 58 mots (200*0.29).
+
+#### Visualisation 3 : N-gram overlap heatmap
+**Explication intuitive** : Une matrice montrant pour n=1 à 4 la précision (quelle proportion des n-grammes du généré sont dans la référence) et le rappel (quelle proportion des n-grammes de la référence sont dans le généré).
+
+**Application concrète** :
+```
+n=1 : P=0.92 R=0.90
+n=2 : P=0.78 R=0.75
+n=3 : P=0.61 R=0.58
+n=4 : P=0.43 R=0.40
+```
+- **Interprétation** : La précision et le rappel diminuent avec n. Le modèle génère des unigrammes très fidèles (92% de précision), mais des 4-grammes beaucoup moins (43%). Le modèle innove dans les séquences longues.
+
+---
+
+### 2.1.1 MachineTranslationAnalyser
+
+#### Métrique 1 : TER (Translation Edit Rate)
+**Explication intuitive** : TER mesure le nombre minimal d'éditions (insertions, suppressions, substitutions, déplacements de mots) pour transformer la traduction générée en référence, normalisé par la longueur de la référence. Un TER de 0.25 signifie qu'il faut 25 éditions pour 100 mots de référence.
+
+**Application concrète** : Traduction "Le produit est bleu" → anglais
+- Référence : "The product is blue"
+- Prédit : "Product is blue" (manque "The")
+- Éditions : 1 insertion ("The") sur 4 mots référence = **0.25**
+- **Interprétation** : Plus TER est bas, mieux c'est. 0.25 est correct.
+
+#### Métrique 2 : COMET (neural translation metric)
+**Explication intuitive** : COMET utilise un réseau neuronal entraîné sur des évaluations humaines pour prédire la qualité d'une traduction. Un score COMET de 0.87 (typiquement entre 0 et 1) signifie une très bonne qualité, proche d'une traduction humaine.
+
+**Application concrète** : Traduction "Ce produit est fantastique" → anglais
+- Référence : "This product is fantastic"
+- Prédit : "This product is great"
+- COMET = **0.87**
+- **Interprétation** : COMET est plus fiable que BLEU car il comprend que "fantastic" et "great" sont synonymes dans ce contexte. 0.87 est un excellent score.
+
+#### Visualisation 1 : COMET/BLEU score vs. source length scatter plot
+**Explication intuitive** : Nuage de points montrant comment la qualité de la traduction varie avec la longueur de la source.
+
+**Application concrète** :
+- Axe X : longueur source (mots)
+- Axe Y : COMET
+- Nuage : points élevés (0.85-0.95) pour sources courtes (<20 mots)
+- Dégradation progressive : pour sources >50 mots, COMET descend à 0.65-0.75
+- **Interprétation** : Le modèle traduit bien les phrases courtes, mais sa qualité chute sur les phrases longues (problème de contexte).
+
+#### Visualisation 2 : Lexical error distribution
+**Explication intuitive** : Diagramme à barres montrant la proportion de chaque type d'erreur (substitution, insertion, délétion, déplacement) dans les erreurs de traduction.
+
+**Application concrète** : Analyse sur 1000 traductions
+- Substitutions (mauvais mot) : 45%
+- Insertions (mot en trop) : 12%
+- Délétions (mot manquant) : 8%
+- Déplacements (ordre des mots) : 35%
+- **Interprétation** : Le principal problème est la substitution (presque la moitié des erreurs), suivie par l'ordre des mots (35%). Les insertions/délétions sont rares.
+
+---
+
+### 2.1.2 SummarizationAnalyser
+
+#### Métrique 1 : Compression ratio
+**Explication intuitive** : Rapport entre la longueur du résumé et la longueur du texte source. Un ratio de 0.25 signifie que le résumé est 4 fois plus court que l'original.
+
+**Application concrète** : Commentaire de 200 mots → résumé de 50 mots
+- **Compression ratio** = 50/200 = **0.25**
+- **Interprétation** : Le modèle condense l'information à 25% de la longueur originale.
+
+#### Métrique 2 : Extractive density
+**Explication intuitive** : Proportion de mots dans le résumé qui sont copiés mot pour mot du texte source (vs. reformulés). Une densité extractive de 0.45 signifie que 45% du résumé est copié directement.
+
+**Application concrète** : Résumé "La batterie tient longtemps, bonne autonomie"
+- Source : "La batterie de ce téléphone tient très longtemps, ce qui offre une excellente autonomie"
+- Mots copiés : "La batterie", "longtemps", "autonomie" → 3 mots sur 6 du résumé = 0.50
+- **Extractive density** = **0.50**
+- **Interprétation** : La moitié du résumé est extractive (copiée), l'autre moitié est abstraite (reformulée). Équilibre sain.
+
+#### Métrique 3 : Coverage
+**Explication intuitive** : Proportion des faits clés du texte source qui sont présents dans le résumé. Un coverage de 0.67 signifie que 2 faits sur 3 sont couverts.
+
+**Application concrète** : Commentaire smartphone de 200 mots avec 3 faits clés :
+1. Batterie longue durée
+2. Écran HD
+3. Prix élevé
+Résumé : mentionne (1) et (2) mais pas (3)
+- **Coverage** = 2/3 = **0.67**
+- **Interprétation** : Le résumé omet un fait important (prix élevé). Coverage complète la compression ratio.
+
+#### Métrique 4 : Faithfulness score (via NLI)
+**Explication intuitive** : Score mesurant si le résumé contient des informations non présentes dans la source (hallucinations). Un score de 0.92 signifie que 92% des affirmations du résumé sont vérifiables dans la source.
+
+**Application concrète** : Résumé "L'écran est pliable et la batterie dure 2 jours"
+- Source : mentionne la batterie (vrai) mais ne mentionne pas d'écran pliable (faux)
+- Modèle NLI : prédit "contradiction" pour "écran pliable" → pénalité
+- **Faithfulness score** = 0.85 (car une hallucination sur deux)
+- **Interprétation** : Le modèle hallucine parfois (15% des cas). C'est un problème pour les applications critiques.
+
+#### Visualisation 1 : Compression ratio distribution
+**Explication intuitive** : Histogramme montrant la distribution des ratios de compression sur tous les résumés.
+
+**Application concrète** :
+- Pic à 0.25-0.30 (compression 4x)
+- Queue à gauche : 10% des résumés avec ratio <0.15 (trop courts)
+- Queue à droite : 5% avec ratio >0.50 (trop longs)
+- **Interprétation** : Le modèle est généralement cohérent (pic à 0.25-0.30), mais 15% des résumés sont mal calibrés en longueur.
+
+#### Visualisation 2 : ROUGE-L vs. compression ratio scatter plot
+**Explication intuitive** : Nuage de points montrant la relation entre la qualité (ROUGE-L) et la compression.
+
+**Application concrète** :
+- Points en forme de dôme : ROUGE-L augmente jusqu'à compression ratio=0.30, puis diminue
+- Optimal à compression ratio=0.30 (ROUGE-L=0.55)
+- **Interprétation** : Il y a un compromis : trop compresser (ratio<0.20) nuit à la qualité, mais pas assez compresser (ratio>0.40) aussi (bruit).
+
+#### Visualisation 3 : Faithfulness score distribution
+**Explication intuitive** : Histogramme des scores de fidélité, pour détecter les résumés hallucinants.
+
+**Application concrète** :
+- 70% des résumés avec score > 0.90 (fidèles)
+- 20% avec score 0.80-0.90 (légères hallucinations)
+- 10% avec score < 0.60 (hallucinations majeures)
+- **Interprétation** : 10% des résumés sont gravement infidèles. Ces cas doivent être analysés manuellement pour comprendre les hallucinations.
+
+---
+
+### 2.1.3 DialogueAnalyser
+
+#### Métrique 1 : BLEU/ROUGE per turn
+**Explication intuitive** : On calcule BLEU/ROUGE pour chaque tour de conversation séparément, ce qui permet de voir si la qualité se dégrade avec le temps.
+
+**Application concrète** : Chatbot sur 50 tours
+- Tour 1-5 : ROUGE-L moyen = 0.52
+- Tour 6-10 : ROUGE-L = 0.48
+- Tour 11-15 : ROUGE-L = 0.44
+- Tour 16-20 : ROUGE-L = 0.39
+- **Interprétation** : La qualité baisse de 13 points du premier au dernier bloc. Le modèle perd le fil de la conversation.
+
+#### Métrique 2 : Response-to-prompt semantic similarity
+**Explication intuitive** : Similarité cosinus entre l'embedding de la réponse et l'embedding de la question/prompt. Une similarité élevée signifie que la réponse est pertinente par rapport à la question.
+
+**Application concrète** :
+- Prompt : "Quelle est l'autonomie de la batterie ?"
+- Réponse : "La batterie dure 2 jours"
+- Similarité cosinus (embeddings) = **0.87**
+- **Interprétation** : Similarité très élevée → réponse très pertinente.
+
+#### Métrique 3 : Distinct-1 / distinct-2
+**Explication intuitive** : Mesure de diversité lexicale. Distinct-1 = nombre d'unigrammes uniques / nombre total d'unigrammes. Distinct-2 idem pour bigrammes. Un distinct-1 de 0.32 signifie que 32% des mots employés sont différents (pas de répétition excessive).
+
+**Application concrète** : Chatbot sur 1000 réponses
+- Total unigrammes = 5000, unigrammes uniques = 1600 → Distinct-1 = 0.32
+- Total bigrammes = 4500, bigrammes uniques = 3060 → Distinct-2 = 0.68
+- **Interprétation** : Le chatbot répète les mêmes mots (seulement 32% sont uniques) mais les combinaisons de deux mots sont beaucoup plus variées (68% uniques). Risque de répétition lexicale.
+
+#### Visualisation 1 : BLEU/ROUGE evolution across turns
+**Explication intuitive** : Courbe montrant l'évolution de la qualité (ROUGE-L) en fonction du numéro de tour.
+
+**Application concrète** :
+- Courbe décroissante linéaire de 0.55 (tour 1) à 0.35 (tour 50)
+- Pente = -0.004 par tour
+- **Interprétation** : Dégradation régulière. Le modèle n'utilise pas efficacement l'historique de conversation.
+
+#### Visualisation 2 : Response length distribution per turn
+**Explication intuitive** : Boxplots ou histogrammes de la longueur des réponses pour chaque tour (ou bloc de tours).
+
+**Application concrète** :
+- Tours 1-10 : longueur médiane = 15 mots
+- Tours 11-20 : médiane = 12 mots
+- Tours 41-50 : médiane = 8 mots
+- **Interprétation** : Le modèle répond de plus en plus court au fil de la conversation. Possible stratégie d'évitement.
+
+#### Visualisation 3 : Distinct-n score vs. conversation depth
+**Explication intuitive** : Courbe montrant comment la diversité lexicale évolue avec la profondeur de la conversation.
+
+**Application concrète** :
+- Distinct-1 : stable autour de 0.30-0.35 sur toute la conversation
+- Distinct-2 : baisse de 0.72 (tours 1-10) à 0.58 (tours 41-50)
+- **Interprétation** : La diversité des bigrammes chute en fin de conversation → le modèle répète des paires de mots.
+
+---
+
+### 2.2 LLMJudgeAnalyser
+
+#### Métrique 1 : Per-criterion score (relevance, coherence, faithfulness)
+**Explication intuitive** : Score (ex: 1-5) attribué par un LLM (ex: GPT-4) pour chaque critère. Une pertinence de 4.2/5 signifie que le LLM juge la réponse globalement pertinente mais avec une petite réserve.
+
+**Application concrète** : Évaluation d'une réponse RAG
+- Pertinence : 4.5/5
+- Cohérence : 4.0/5
+- Fidélité : 3.8/5
+- **Interprétation** : La réponse est pertinente (bonne) et cohérente (correcte), mais la fidélité est un peu faible (peut-être une légère hallucination).
+
+#### Métrique 2 : Calibrated score (Rogan & Gladen correction)
+**Explication intuitive** : Correction des biais systématiques du LLM juge (ex: tendance à favoriser les réponses longues ou en première position). Un score brut de 4.2 devient 4.05 après calibration.
+
+**Application concrète** :
+- Score brut moyen = 4.2/5
+- Biais identifié : le LLM juge note systématiquement 0.15 plus haut les réponses longues (>100 mots)
+- Score calibré = 4.2 - 0.15 = **4.05**
+- **Interprétation** : Après correction du biais, le vrai score est 4.05.
+
+#### Métrique 3 : Self-consistency score
+**Explication intuitive** : Variance des scores quand on appelle le LLM juge plusieurs fois (N fois) sur le même input. Une variance de 0.1 signifie que le juge n'est pas parfaitement cohérent avec lui-même.
+
+**Application concrète** : 10 appels du LLM sur le même exemple
+- Scores : [4.2, 4.1, 4.3, 4.0, 4.2, 4.1, 4.2, 4.3, 4.0, 4.2]
+- Moyenne = 4.16, écart-type = 0.09 → variance = **0.008** (très faible)
+- **Interprétation** : Le LLM juge est très cohérent avec lui-même (faible variance). On peut lui faire confiance.
+
+#### Métrique 4 : Inter-judge agreement (Cohen's κ)
+**Explication intuitive** : Accord entre deux LLM juges différents (ex: GPT-4 et Claude). κ=0.82 signifie un accord presque parfait.
+
+**Application concrète** : GPT-4 vs. Claude sur 100 évaluations
+- Accord observé = 89%
+- Accord dû au hasard = 40%
+- κ = (0.89-0.40)/(1-0.40) = 0.49/0.60 = **0.82**
+- **Interprétation** : κ > 0.80 → accord presque parfait. Les deux LLM jugent de manière similaire.
+
+#### Visualisation 1 : Per-criterion radar chart
+**Explication intuitive** : Graphique radar (en toile d'araignée) montrant les scores pour chaque critère, permettant de voir visuellement les forces/faiblesses.
+
+**Application concrète** :
+- Axes : Pertinence, Cohérence, Fidélité, Fluidité, Utilité
+- Valeurs : 4.5, 4.0, 3.8, 4.2, 4.1
+- Forme : légèrement aplatie sur l'axe Fidélité (3.8)
+- **Interprétation** : La fidélité est le point faible. Le radar le montre instantanément.
+
+#### Visualisation 2 : Raw vs. calibrated score distribution per judge
+**Explication intuitive** : Boîtes à moustaches ou histogrammes comparant la distribution des scores bruts et calibrés pour chaque juge.
+
+**Application concrète** :
+- GPT-4 brut : médiane 4.2, IQR [4.0-4.4]
+- GPT-4 calibré : médiane 4.05, IQR [3.85-4.25] (décalage vers le bas)
+- **Interprétation** : La calibration a décalé toute la distribution de -0.15.
+
+#### Visualisation 3 : Calibration scatter plot (raw vs. corrected score)
+**Explication intuitive** : Nuage de points avec raw en X, corrigé en Y. La diagonale représente l'absence de correction.
+
+**Application concrète** :
+- Points alignés sur une droite de pente 1, décalée vers le bas
+- Équation : corrigé = raw - 0.15
+- Points au-dessus de la diagonale si raw faible, en dessous si raw élevé
+- **Interprétation** : Le biais est additif constant (-0.15). Pas de correction multiplicative.
+
+---
+
+### 2.3 AbstractiveQAAnalyser
+
+#### Métrique 1 : ROUGE-L (avec référence)
+**Explication intuitive** : Version de ROUGE utilisant la plus longue sous-séquence commune. Un ROUGE-L de 0.60 signifie que 60% de la séquence de la réponse de référence est retrouvée dans la réponse générée.
+
+**Application concrète** : QA sur article de produit
+- Question : "Quelle est la capacité de la batterie ?"
+- Réponse générée : "5000 mAh"
+- Référence : "La batterie a une capacité de 5000 milliampères-heures"
+- Plus longue sous-séquence commune : "5000 mAh" (2 tokens) sur référence (9 tokens) → ROUGE-L = 2/9 ≈ 0.22 (très faible)
+- **Interprétation** : ROUGE-L sous-estime la qualité car la réponse est correcte mais plus courte. Pas adapté pour QA.
+
+#### Métrique 2 : BERTScore (avec référence)
+**Explication intuitive** : Même principe que pour la génération, mais pour la QA. Un BERTScore de 0.89 signifie une forte similarité sémantique avec la référence.
+
+**Application concrète** : Même exemple
+- BERTScore F1 = **0.89**
+- **Interprétation** : Sémantiquement, "5000 mAh" et "5000 milliampères-heures" sont quasi identiques. BERTScore est bien plus adapté que ROUGE pour la QA.
+
+#### Métrique 3 : Faithfulness (via LLMJudge, sans référence)
+**Explication intuitive** : Le LLM juge si la réponse est fidèle au document source (pas d'hallucination). Un score de 0.85 signifie que la réponse est fidèle à 85%.
+
+**Application concrète** :
+- Document source : "La batterie du X100 a une capacité de 5000mAh"
+- Question : "Quelle est la capacité de la batterie ?"
+- Réponse : "5000 mAh" → faithfulness = 0.98
+- Réponse : "4500 mAh" → faithfulness = 0.45 (contradiction)
+- **Interprétation** : Le LLM juge détecte bien les hallucinations. La version avec référence (BERTScore) n'est pas toujours disponible.
+
+#### Métrique 4 : Answer relevance (via LLMJudge, sans référence)
+**Explication intuitive** : Le LLM juge si la réponse répond réellement à la question (peut être fidèle mais hors-sujet). Un score de 0.75 signifie que la réponse est partiellement pertinente.
+
+**Application concrète** :
+- Question : "Quelle est la capacité de la batterie ?"
+- Réponse : "Le X100 a un écran HD" → fidèle au document mais hors-sujet → relevance = 0.10
+- Réponse : "5000 mAh" → relevance = 0.95
+- **Interprétation** : Pertinence et fidélité sont deux dimensions différentes. Il faut les deux.
+
+#### Visualisation 1 : BERTScore distribution
+**Explication intuitive** : Histogramme des BERTScore sur l'ensemble des questions-réponses.
+
+**Application concrète** :
+- Moyenne = 0.85, médiane = 0.87
+- 10% des réponses avec BERTScore < 0.65 (problématiques)
+- **Interprétation** : La majorité des réponses sont sémantiquement proches de la référence, mais 10% sont très éloignées.
+
+#### Visualisation 2 : Score stratified by reference availability
+**Explication intuitive** : Comparaison (boxplots) des scores pour les exemples avec référence vs. sans référence.
+
+**Application concrète** :
+- Avec référence (BERTScore) : médiane 0.87, IQR 0.12
+- Sans référence (faithfulness) : médiane 0.85, IQR 0.20
+- **Interprétation** : Les scores sans référence ont plus de variance (IQR plus large). C'est normal car faithfulness est plus difficile à estimer.
+
+#### Visualisation 3 : Faithfulness score distribution (reference-free branch)
+**Explication intuitive** : Histogramme des scores de fidélité (estimés par LLM) pour les cas sans référence.
+
+**Application concrète** :
+- 70% des réponses avec faithfulness > 0.90
+- 15% entre 0.70-0.90
+- 15% < 0.70 (hallucinations)
+- **Interprétation** : 15% des réponses contiennent des hallucinations significatives. À investiguer.
+
+---
+
+### 2.4 RagAnalyser
+
+#### Métrique 1 (retrieval) : Precision@k, Recall@k, NDCG@k, MRR
+(Voir section 7 RetrievalAnalyser)
+
+#### Métrique 2 (generation) : Faithfulness (RAGAS framework)
+**Explication intuitive** : Version RAGAS de la fidélité : vérifie que chaque affirmation de la réponse est soutenue par un contexte retrievé. Un score de 0.88 signifie que 88% des affirmations sont vérifiables dans le contexte.
+
+**Application concrète** :
+- Contexte retrievé : document sur la batterie X100 (5000mAh)
+- Réponse : "La batterie fait 5000mAh et l'écran est pliable"
+- Affirmation "5000mAh" : soutenue par contexte (vrai)
+- Affirmation "écran pliable" : non soutenue (faux)
+- Faithfulness = 1 affirmation sur 2 = **0.50**
+- **Interprétation** : Le générateur a halluciné sur l'écran pliable.
+
+#### Métrique 3 (generation) : Context precision (RAGAS)
+**Explication intuitive** : Proportion des documents retrievés qui sont réellement pertinents pour répondre à la question. Une précision contexte de 0.76 signifie que 76% des documents retrievés sont pertinents.
+
+**Application concrète** :
+- Query : "batterie X100"
+- 5 documents retrievés : pertinence = [1, 0, 1, 0, 1] (1=pertinent, 0=non)
+- Context precision@5 = (1/1 + 2/3 + 3/5)/3 = (1 + 0.67 + 0.6)/3 = **0.76**
+- **Interprétation** : Le retrieveur ramène des documents non pertinents (2 sur 5). C'est la cause probable des hallucinations.
+
+#### Métrique 4 (generation) : Answer relevance (RAGAS)
+**Explication intuitive** : Le LLM juge si la réponse répond à la question. Un score de 0.92 signifie une très bonne pertinence.
+
+**Application concrète** : Même query
+- Réponse : "La batterie du X100 a 5000mAh" → relevance = 0.95
+- Réponse : "Le X100 est un smartphone" → relevance = 0.30
+- **Interprétation** : Le générateur répond bien à la question quand le contexte est bon.
+
+#### Visualisation 1 : Retrieval score vs. generation score scatter plot
+**Explication intuitive** : Chaque point = une query, avec en X le NDCG@5 (retrieval) et en Y le faithfulness (generation). La corrélation révèle l'impact du retrieval sur la génération.
+
+**Application concrète** :
+- Quadrant haut-droit (bon retrieval + bonne génération) : 60% des queries
+- Quadrant bas-gauche (mauvais les deux) : 15%
+- Corrélation de Pearson = 0.65
+- **Interprétation** : Une bonne récupération de contexte est fortement corrélée à une bonne génération. Améliorer le retrieval est prioritaire.
+
+#### Visualisation 2 : Faithfulness distribution
+**Explication intuitive** : Histogramme des scores de fidélité sur l'ensemble des queries.
+
+**Application concrète** :
+- Moyenne = 0.82, médiane = 0.85
+- 15% des queries avec faithfulness < 0.60 (hallucinations graves)
+- **Interprétation** : 15% des réponses RAG sont gravement infidèles. À analyser : sont-ce des problèmes de retrieval ou de génération ?
+
+#### Visualisation 3 : Context precision vs. answer relevance scatter plot
+**Explication intuitive** : Nuage de points montrant pour chaque query la relation entre la précision du contexte et la pertinence de la réponse.
+
+**Application concrète** :
+- Points majoritairement dans le quadrant haut-droit (précision contexte >0.8 et relevance >0.8)
+- Points isolés en bas-gauche : queries où le contexte est mauvais ET la réponse hors-sujet
+- **Interprétation** : Une bonne précision du contexte est nécessaire mais pas suffisante pour une bonne pertinence (certains points avec bonne précision mais relevance médiocre → problème de génération).
+
+---
+
+## 3. ExtractiveQAAnalyser
+
+### Métrique 1 : Exact Match (EM)
+**Explication intuitive** : Proportion de réponses qui correspondent exactement à la réponse attendue (caractère pour caractère). Un EM de 0.65 signifie que 65% des réponses sont parfaites.
+
+**Application concrète** : Contexte = "Le X100 sorti en 2023 a une batterie 5000mAh"
+- Question : "Quand est sorti le X100 ?"
+- Span gold : "2023"
+- Span prédit : "2023" → EM = 1.0
+- Span prédit : "2023." (avec point) → EM = 0 (car caractère différent)
+- Sur 1000 questions, 650 réponses exactes → **EM = 0.65**
+- **Interprétation** : EM est très strict (pénalise la ponctuation). 65% de réponses parfaites.
+
+### Métrique 2 : Token-level F1
+**Explication intuitive** : F1 au niveau des tokens (mots), plus indulgent que EM. Un token F1 de 0.82 signifie que les réponses se chevauchent à 82% en moyenne avec la réponse gold.
+
+**Application concrète** : Même exemple
+- Gold : "2023" (1 token)
+- Prédit : "2023." (1 token, mais "." compte comme token séparé ? Selon tokenisation)
+- Si tokenisation sur mots : "2023" et "2023." sont différents → précision=0, rappel=0 → F1=0
+- Si tokenisation inclut ponctuation : "2023" ≠ "2023." → toujours 0
+- Donc pour une réponse d'un token, EM = F1.
+- Pour une réponse plus longue : Gold "2023 et 2024", Prédit "2023" → F1=0.67
+- **Interprétation** : F1 est plus informatif pour les réponses multi-tokens.
+
+### Métrique 3 : Answer position accuracy
+**Explication intuitive** : Précision de la position relative de la réponse dans le contexte (offset). Un score élevé indique que le modèle localise bien la réponse, même si le texte exact diffère légèrement.
+
+**Application concrète** : Contexte de 1000 caractères
+- Position gold : caractères 200-203 ("2023")
+- Position prédite : caractères 200-204 ("2023.") → décalage de 1
+- Answer position accuracy = 1 - (décalage_absolu / longueur_contexte) = 1 - (1/1000) = 0.999
+- **Interprétation** : Le modèle a presque parfaitement localisé la réponse, même si le span exact est un peu différent.
+
+#### Visualisation 1 : EM and F1 distribution histogram
+**Explication intuitive** : Histogramme superposé des scores EM et F1.
+
+**Application concrète** :
+- EM : pic à 0 (40% des exemples) et pic à 1 (30% des exemples) → distribution bimodale
+- F1 : distribution plus étalée, moyenne 0.65
+- **Interprétation** : Beaucoup d'échecs complets (EM=0) mais aussi beaucoup de réussites parfaites (EM=1). Peu de cas intermédiaires.
+
+#### Visualisation 2 : Answer span length distribution
+**Explication intuitive** : Histogramme de la longueur des réponses (gold).
+
+**Application concrète** :
+- 60% des réponses : 1 token
+- 25% : 2-3 tokens
+- 10% : 4-5 tokens
+- 5% : 6+ tokens
+- **Interprétation** : La majorité des réponses sont courtes (1 token). Le modèle doit exceller sur les réponses d'un seul mot.
+
+#### Visualisation 3 : F1 score vs. context length scatter plot
+**Explication intuitive** : Nuage de points montrant comment le F1 varie avec la longueur du contexte.
+
+**Application concrète** :
+- Contexte < 500 tokens : F1 moyen = 0.85
+- Contexte 500-1000 tokens : F1 = 0.72
+- Contexte > 1000 tokens : F1 = 0.58
+- Régression linéaire : pente = -0.0003 par token
+- **Interprétation** : Dégradation linéaire significative. Le modèle a du mal à localiser la réponse dans les longs contextes.
+
+---
+
+## 4. RepresentationAnalyser
+
+### Métrique : Pairwise cosine distance distribution
+**Explication intuitive** : Distribution des distances cosinus entre toutes les paires d'embeddings. Une distance faible signifie que les points sont proches (similarité élevée).
+
+**Application concrète** : Embeddings de 1000 commentaires (dimension 384)
+- Distance moyenne intra-classe (même sentiment) = 0.32
+- Distance moyenne inter-classe = 0.58
+- **Interprétation** : Les points de la même classe sont deux fois plus proches (0.32) que les points de classes différentes (0.58). Bonne séparation.
+
+#### Visualisation : 2D projection (t-SNE / UMAP)
+**Explication intuitive** : Projection des embeddings 384D en 2D pour visualisation. Chaque point est coloré par sa classe.
+
+**Application concrète** :
+- 3 clusters distincts (positif, négatif, neutre)
+- Cluster neutre : plus dispersé, chevauchement avec les extrêmes
+- **Interprétation** : La classe neutre est moins bien séparée, confirmant les scores F1 plus faibles.
+
+---
+
+### 4.1 EmbeddingAnalyser
+
+#### Métrique 1 : Anisotropy
+**Explication intuitive** : Mesure à quel point les embeddings sont concentrés dans une direction privilégiée (vs. uniformément répartis). Une anisotropic élevée (proche de 1) signifie que tous les vecteurs pointent dans la même direction.
+
+**Application concrète** :
+- Moyenne des cosinus entre toutes paires = 0.72
+- Anisotropie = 1 - 0.72 = **0.28**
+- **Interprétation** : Anisotropie modérée (0.28 sur une échelle de 0 à 1). Les embeddings ne sont pas complètement isotropes, mais ce n'est pas catastrophique.
+
+#### Métrique 2 : Alignment & uniformity (Wang & Isola)
+**Explication intuitive** : Alignment mesure la proximité des embeddings d'exemples similaires. Uniformity mesure la dispersion uniforme sur l'hypersphère. Un bon espace a alignment élevé et uniformity basse.
+
+**Application concrète** :
+- Alignment = 0.85 (élevé, bon)
+- Uniformity = 0.45 (moyen)
+- **Interprétation** : Les exemples similaires sont bien regroupés (alignment élevé), mais l'espace n'est pas parfaitement uniforme (certaines régions sont surpeuplées).
+
+#### Métrique 3 : Intrinsic dimensionality (ID)
+**Explication intuitive** : Nombre effectif de dimensions nécessaires pour représenter la variance des données. Un ID de 8 sur 384 signifie que les embeddings vivent dans un sous-espace de très basse dimension.
+
+**Application concrète** :
+- Dimension nominale = 384
+- Intrinsic dimensionality = **8**
+- **Interprétation** : Les embeddings BERT sont très redondants : 376 dimensions sont inutiles. C'est un signe de représentation collapse. Comparer avec d'autres modèles.
+
+#### Métrique 4 : Pearson/Spearman correlation on STS benchmarks
+**Explication intuitive** : Corrélation entre la similarité cosinus des embeddings et les jugements humains de similarité sémantique. Un ρ de 0.82 signifie un fort alignement avec la perception humaine.
+
+**Application concrète** : Benchmarks STS (Semantic Textual Similarity)
+- Pearson = 0.79, Spearman = **0.82**
+- **Interprétation** : Les embeddings capturent bien la similarité sémantique selon les humains.
+
+#### Visualisation 1 : 2D t-SNE/UMAP projection (déjà vu)
+
+#### Visualisation 2 : Cosine similarity distribution (intra-class vs. inter-class)
+**Explication intuitive** : Histogrammes superposés des similarités cosinus intra-classe (même label) et inter-classe (labels différents).
+
+**Application concrète** :
+- Intra-classe : pic à 0.85 (forte similarité)
+- Inter-classe : pic à 0.35 (faible similarité)
+- Chevauchement minime
+- **Interprétation** : Très bonne séparation. Le modèle a appris une représentation discriminative.
+
+#### Visualisation 3 : Predicted vs. gold STS score scatter plot
+**Explication intuitive** : Nuage de points comparant la similarité prédite par le modèle (cosinus) à la similarité gold (annotation humaine).
+
+**Application concrète** :
+- Points bien alignés sur la diagonale
+- Corrélation de Pearson = 0.79
+- **Interprétation** : Le modèle prédit bien la similarité humaine, avec quelques outliers.
+
+---
+
+### 4.2 UnsupervisedNLPAnalyser
+
+#### Métrique : Intra-group cosine similarity
+**Explication intuitive** : Similarité cosinus moyenne entre les points d'un même groupe découvert (sans labels). Un score de 0.67 signifie une bonne cohésion interne.
+
+**Application concrète** : Clustering de commentaires (sans labels)
+- 8 clusters découverts
+- Similarité intra-cluster moyenne = **0.67**
+- **Interprétation** : Les groupes sont cohérents (similarité élevée). Bonne séparation.
+
+#### Visualisation : 2D projection coloured by discovered group
+**Explication intuitive** : Projection 2D (UMAP) où chaque point est coloré par le cluster attribué par l'algorithme non supervisé.
+
+**Application concrète** :
+- 8 couleurs distinctes
+- 2 clusters très proches visuellement (confusion possible)
+- **Interprétation** : Deux clusters sont similaires, peut-être à fusionner.
+
+---
+
+### 4.2.1 TopicModelingAnalyser
+
+#### Métrique 1 : Topic coherence C_V
+**Explication intuitive** : Mesure de la cohérence sémantique d'un topic : les mots du topic apparaissent-ils souvent ensemble dans le corpus ? Un C_V de 0.62 est correct (bonne cohérence).
+
+**Application concrète** : Topic #3 = ["batterie", "autonomie", "charge", "durée", "accumulateur"]
+- C_V = **0.62**
+- **Interprétation** : Ces mots co-occurrent naturellement dans le corpus (parlent tous de la batterie). Topic cohérent.
+
+#### Métrique 2 : Topic diversity
+**Explication intuitive** : Proportion de mots uniques dans les top-mots de tous les topics (évite la redondance). Une diversité de 0.85 signifie que 85% des mots sont uniques à un topic.
+
+**Application concrète** : 10 topics × 10 top-mots = 100 positions
+- Mots uniques = 85
+- **Topic diversity** = 0.85
+- **Interprétation** : Bonne diversité. Peu de mots apparaissent dans plusieurs topics.
+
+#### Métrique 3 : Model perplexity on held-out documents
+**Explication intuitive** : Mesure de surprise du modèle sur des documents non vus. Une perplexité plus basse est meilleure. 450 est acceptable.
+
+**Application concrète** :
+- Perplexité sur documents de test = **450**
+- **Interprétation** : Le modèle prédit correctement les mots des documents tenus de côté.
+
+#### Visualisation 1 : Per-topic top-word bar chart / word cloud
+**Explication intuitive** : Pour chaque topic, afficher les mots les plus importants (par taille de police).
+
+**Application concrète** :
+- Topic 1 : "batterie" (gros), "autonomie", "charge"
+- Topic 2 : "écran", "HD", "couleurs"
+- **Interprétation** : Visualisation rapide du contenu de chaque topic.
+
+#### Visualisation 2 : Document-topic distribution heatmap
+**Explication intuitive** : Matrice où chaque ligne est un document, chaque colonne un topic, la couleur représente la proportion.
+
+**Application concrète** : Heatmap avec 100 documents × 10 topics
+- Lignes majoritairement d'une seule couleur (document dominé par 1 topic)
+- Quelques lignes avec mélange de couleurs
+- **Interprétation** : La plupart des documents sont associés à un topic principal, certains sont mixtes.
+
+#### Visualisation 3 : Coherence vs. number of topics curve (elbow detection)
+**Explication intuitive** : Courbe de la cohérence moyenne en fonction du nombre de topics. Le coude indique le nombre optimal.
+
+**Application concrète** :
+- 5 topics : C_V=0.58
+- 10 topics : C_V=0.63 (max)
+- 15 topics : C_V=0.61
+- 20 topics : C_V=0.58
+- **Interprétation** : Le maximum est à 10 topics. C'est le choix optimal.
+
+---
+
+### 4.2.2 ClusteringNLPAnalyser
+
+#### Métrique 1 : Silhouette score
+**Explication intuitive** : Mesure de la compacité et séparation des clusters. Varie de -1 à 1. Un score de 0.52 signifie une structure modérément définie.
+
+**Application concrète** : KMeans avec k=8 sur embeddings
+- Score silhouette moyen = **0.52**
+- **Interprétation** : Les clusters sont modérément séparés. 0.52 > 0.5 est acceptable.
+
+#### Métrique 2 : Davies-Bouldin index
+**Explication intuitive** : Rapport entre la dispersion intra-cluster et la séparation inter-cluster. Plus bas est mieux. 1.2 est correct.
+
+**Application concrète** :
+- Davies-Bouldin = **1.2**
+- **Interprétation** : Les clusters sont raisonnablement séparés (1.2 est modéré).
+
+#### Métrique 3 : Calinski-Harabasz index
+**Explication intuitive** : Rapport entre la dispersion inter-clusters et intra-cluster. Plus haut est mieux. 1500 est correct.
+
+**Application concrète** :
+- Calinski-Harabasz = **1500**
+- **Interprétation** : Bonne séparation relative.
+
+#### Métrique 4 (si labels disponibles) : Adjusted Rand Index (ARI)
+**Explication intuitive** : Similarité entre les clusters découverts et les vrais labels (ajustée pour le hasard). Un ARI de 0.65 signifie un bon accord.
+
+**Application concrète** : Clusters vs. vrais sentiments (positif/négatif/neutre)
+- ARI = **0.65**
+- **Interprétation** : Les clusters correspondent modérément bien aux sentiments. Certains clusters mélangent plusieurs sentiments.
+
+#### Métrique 5 (si labels disponibles) : Normalised Mutual Information (NMI)
+**Explication intuitive** : Information mutuelle normalisée entre clusters et labels. Un NMI de 0.70 signifie un fort partage d'information.
+
+**Application concrète** :
+- NMI = **0.70**
+- **Interprétation** : Les clusters capturent bien l'information des labels.
+
+#### Visualisation 1 : 2D projection coloured by cluster assignment (déjà vu)
+
+#### Visualisation 2 : Silhouette plot
+**Explication intuitive** : Graphique montrant le score silhouette de chaque point, trié par cluster. Les clusters épais avec scores élevés sont bons.
+
+**Application concrète** :
+- Cluster 1 : épaisseur large, silhouette moyenne=0.68 (compact)
+- Cluster 5 : épaisseur fine, silhouette moyenne=0.23 (peu défini)
+- **Interprétation** : Le cluster 5 est problématique (points mal assignés). À investiguer.
+
+#### Visualisation 3 : Silhouette score vs. number of clusters curve
+**Explication intuitive** : Courbe du score silhouette en fonction du nombre de clusters. Le pic indique le k optimal.
+
+**Application concrète** :
+- k=2 : 0.45
+- k=4 : 0.51
+- k=6 : 0.54
+- k=8 : 0.52
+- k=10 : 0.48
+- **Interprétation** : Le maximum est à k=6 (0.54). C'est mieux que k=8 (0.52).
+
+#### Visualisation 4 : Inertia / distortion elbow curve
+**Explication intuitive** : Courbe de l'inertie (somme des distances intra-cluster) en fonction de k. Le coude indique un bon k.
+
+**Application concrète** :
+- k=1→8 : forte baisse
+- k=8→15 : baisse lente (coude à 8)
+- **Interprétation** : Le coude est à k=8, cohérent avec silhouette (k=6 donne un meilleur silhouette mais k=8 donne une inertie plus basse). Choix à faire.
+
+---
+
+## 5. AudioAnalyser
+
+### Visualisation 1 : Waveform plot
+**Explication intuitive** : Graphique de l'amplitude du signal audio en fonction du temps.
+
+**Application concrète** : Enregistrement "batterie excellente" (3 secondes)
+- Axe X : 0 à 3 secondes
+- Axe Y : amplitude (-1 à 1)
+- Forme d'onde : pics d'amplitude sur les voyelles ("a", "e", "e")
+- **Interprétation** : Visualisation des segments sonores et du volume.
+
+### Visualisation 2 : Mel spectrogram
+**Explication intuitive** : Représentation temps-fréquence avec échelle Mel (perceptuelle). Axe X = temps, Axe Y = fréquence (Mel), Couleur = intensité.
+
+**Application concrète** : Même enregistrement
+- Bandes horizontales sombres : formants des voyelles
+- Silence entre les mots ("batterie" puis "excellente")
+- **Interprétation** : Visualisation des caractéristiques spectrales utilisées par les modèles audio.
+
+---
+
+### 5.1 ASRAnalyser
+
+#### Métrique 1 : Word Error Rate (WER)
+**Explication intuitive** : Proportion de mots erronés (substitutions + insertions + déletions) par rapport à la référence. 0.20 signifie 20% d'erreurs (80% correct).
+
+**Application concrète** : Transcription "la batterie tient deux jours"
+- Référence : "la batterie tient deux jours"
+- Prédit : "la batterie tient de jours"
+- Substitutions : "deux"→"de" (1 erreur), Insertions : 0, Délétions : 0
+- Total mots référence = 5
+- WER = (1+0+0)/5 = **0.20**
+- **Interprétation** : 80% des mots sont corrects. Une erreur sur "deux".
+
+#### Métrique 2 : Character Error Rate (CER)
+**Explication intuitive** : Même principe que WER mais au niveau des caractères. Plus strict. Un CER de 0.08 signifie 8% de caractères erronés.
+
+**Application concrète** : Même exemple
+- Référence : "deux" (4 caractères)
+- Prédit : "de" (2 caractères)
+- Caractères corrects : "d","e" (2), manquants : "u","x" (2)
+- CER sur ce mot = 2/4 = 0.50
+- CER moyen sur toute la phrase = **0.08** (car une seule erreur sur beaucoup de caractères)
+- **Interprétation** : CER est plus indulgent que WER pour les petites erreurs.
+
+#### Métrique 3 : WER stratified by speaker and utterance length
+**Explication intuitive** : WER calculé séparément pour différents locuteurs et différentes longueurs d'utterance.
+
+**Application concrète** :
+- Locuteur A (homme, débit rapide) : WER=0.25
+- Locuteur B (femme, débit lent) : WER=0.12
+- Utterances < 5 mots : WER=0.05
+- Utterances 5-10 mots : WER=0.15
+- Utterances > 10 mots : WER=0.30
+- **Interprétation** : Le modèle performe moins bien sur les voix rapides et les phrases longues.
+
+#### Métrique 4 : Real-Time Factor (RTF, optionnel)
+**Explication intuitive** : Rapport entre le temps de traitement et la durée de l'audio. Un RTF de 0.5 signifie que le modèle traite 2 secondes d'audio par seconde réelle.
+
+**Application concrète** :
+- Durée audio = 10 secondes
+- Temps de transcription = 5 secondes
+- RTF = 5/10 = **0.5**
+- **Interprétation** : Le modèle est deux fois plus rapide que le temps réel (0.5 < 1). Bon pour le déploiement.
+
+#### Visualisation 1 : WER distribution by utterance length
+**Explication intuitive** : Boîtes à moustaches ou points montrant le WER en fonction de la longueur.
+
+**Application concrète** : Nuage de points avec régression
+- Augmentation du WER avec la longueur
+- Variance plus élevée pour les longues phrases
+- **Interprétation** : Les phrases longues sont plus difficiles et plus variables.
+
+#### Visualisation 2 : Substitution / deletion / insertion error breakdown bar chart
+**Explication intuitive** : Diagramme à barres empilées ou séparées des types d'erreurs.
+
+**Application concrète** : Sur 1000 utterances
+- Substitutions : 62%
+- Délétions : 28%
+- Insertions : 10%
+- **Interprétation** : La principale erreur est la substitution (mauvais mot). Les insertions (mots en trop) sont rares.
+
+#### Visualisation 3 : WER vs. signal-to-noise ratio scatter plot (si SNR disponible)
+**Explication intuitive** : Nuage de points montrant l'impact du bruit de fond sur la transcription.
+
+**Application concrète** :
+- SNR élevé (peu de bruit) : WER bas (0.05-0.10)
+- SNR faible (beaucoup de bruit) : WER élevé (0.30-0.50)
+- Corrélation négative forte
+- **Interprétation** : Le modèle est très sensible au bruit.
+
+---
+
+### 5.2 TTSAnalyser
+
+#### Métrique 1 : Mean Opinion Score (MOS)
+**Explication intuitive** : Score subjectif moyen (1-5) donné par des humains sur la qualité de la synthèse. Un MOS de 4.2 signifie "très bonne qualité, presque naturelle".
+
+**Application concrète** : Synthèse de "batterie longue durée"
+- 10 évaluateurs : scores [4, 5, 4, 4, 5, 3, 4, 4, 5, 4]
+- MOS = (4+5+4+4+5+3+4+4+5+4)/10 = 42/10 = **4.2**
+- **Interprétation** : Qualité très bonne, un évaluateur a donné 3 (moyen).
+
+#### Métrique 2 : PESQ (signal quality)
+**Explication intuitive** : Mesure objective de la qualité du signal (dégradations, bruit). Score typique de -0.5 à 4.5. Un PESQ de 4.0 est excellent.
+
+**Application concrète** :
+- PESQ = **4.0** (sur 4.5 max)
+- **Interprétation** : Très peu de dégradation du signal.
+
+#### Métrique 3 : UTMOS (neural MOS estimator)
+**Explication intuitive** : Modèle neuronal qui prédit le MOS sans humains. Un UTMOS de 4.2 est excellent.
+
+**Application concrète** :
+- UTMOS = **4.2**
+- **Interprétation** : Le modèle neuronal prédit une qualité humaine élevée.
+
+#### Métrique 4 : F0 continuity (pitch trajectory smoothness)
+**Explication intuitive** : Lissage de la courbe de fréquence fondamentale (pitch). Une F0 discontinue indique une prosodie artificielle.
+
+**Application concrète** : Phrase "La batterie est excellente"
+- Référence humaine : courbe de pitch montante sur "excellente"
+- Synthèse : pitch constant → discontinuité détectée
+- Score de lissage = **0.75** (1 = parfait)
+- **Interprétation** : La prosodie est un peu plate, manque de naturel.
+
+#### Visualisation 1 : Mel spectrogram (generated vs. reference aligned)
+**Explication intuitive** : Deux spectrogrammes côte à côte (généré vs. référence humaine) pour comparaison visuelle.
+
+**Application concrète** :
+- Référence : formants nets, transitions douces
+- Généré : formants légèrement flous, transitions plus brutales
+- **Interprétation** : Le généré est proche mais moins précis.
+
+#### Visualisation 2 : MOS score distribution
+**Explication intuitive** : Histogramme des scores MOS individuels des évaluateurs.
+
+**Application concrète** :
+- 60% des scores = 4 ou 5
+- 30% = 3
+- 10% = 2 ou 1
+- **Interprétation** : La majorité aime, mais 10% trouvent la qualité médiocre.
+
+#### Visualisation 3 : PESQ vs. UTMOS correlation scatter plot
+**Explication intuitive** : Nuage de points montrant la corrélation entre PESQ (signal) et UTMOS (perception).
+
+**Application concrète** :
+- Corrélation = 0.85 (forte)
+- Points bien alignés sur la diagonale
+- **Interprétation** : Les deux métriques sont cohérentes. UTMOS peut remplacer PESQ.
+
+#### Visualisation 4 : F0 contour comparison (generated vs. reference)
+**Explication intuitive** : Courbes de pitch superposées (généré vs. référence).
+
+**Application concrète** :
+- Référence : courbe montante sur "excellente" (150→200 Hz)
+- Généré : courbe plate à 170 Hz
+- **Interprétation** : Visualisation claire du problème de prosodie.
+
+---
+
+### 5.3 AudioClassificationAnalyser (hérite de SequenceClassificationAnalyser)
+
+#### Métriques et visualisations : identiques à SequenceClassificationAnalyser, mais appliquées aux caractéristiques audio (Mel spectrogram, MFCC, etc.)
+
+#### Visualisation supplémentaire : Feature importance heatmap on Mel spectrogram frequency bands
+**Explication intuitive** : Heatmap montrant quelles bandes de fréquences sont importantes pour la classification.
+
+**Application concrète** : Classification du sentiment sur audio
+- Basses fréquences (200-400Hz) : importance élevée (voix, formants)
+- Hautes fréquences (6000Hz+) : importance nulle (bruit)
+- **Interprétation** : Le modèle se concentre sur la voix, ignore le bruit aigu.
+
+---
+
+### 5.4 SpeechTranslationAnalyser
+
+#### Métrique 1 : End-to-end BLEU and chrF
+**Explication intuitive** : BLEU/chrF de la traduction finale (audio source → texte cible), sans accès à la transcription intermédiaire.
+
+**Application concrète** : Audio français → texte anglais
+- Référence : "The battery is good"
+- Traduction E2E : "The battery good"
+- BLEU = 0.75 (pénalise l'absence de "is")
+- **Interprétation** : Qualité de traduction acceptable.
+
+#### Métrique 2 : Intermediate WER (sur transcription forcée)
+**Explication intuitive** : WER de l'ASR sur la transcription forcée (si disponible). Permet de décomposer l'erreur : ASR vs. MT.
+
+**Application concrète** :
+- ASR produit : "battery good" (au lieu de "battery is good")
+- WER intermédiaire = 0.33 (un mot manquant sur 3)
+- MT final : "battery good" → "batterie bonne" (mauvaise traduction due à l'ASR)
+- **Interprétation** : L'erreur vient de l'ASR (80%), pas du MT.
+
+#### Visualisation : End-to-end BLEU distribution
+**Explication intuitive** : Histogramme des scores BLEU sur toutes les traductions.
+
+**Application concrète** :
+- Moyenne = 0.68, médiane = 0.70
+- 10% avec BLEU < 0.50 (problématiques)
+- **Interprétation** : La plupart des traductions sont bonnes, mais 10% sont mauvaises.
+
+#### Visualisation : ASR WER vs. MT BLEU scatter plot (error source attribution)
+**Explication intuitive** : Chaque point = un utterance, X = WER de l'ASR, Y = BLEU de la MT.
+
+**Application concrète** :
+- Corrélation négative forte (r = -0.78)
+- Quadrant bas-gauche (WER bas, BLEU élevé) : majorité
+- Quadrant haut-droit (WER élevé, BLEU bas) : 15% des cas
+- **Interprétation** : La qualité de la traduction est fortement déterminée par la qualité de la transcription. Améliorer l'ASR est la priorité.
+
+---
+
+## 6. FillMaskAnalyser
+
+### Métrique 1 : Top-k accuracy (k ∈ {1, 5, 10})
+**Explication intuitive** : Proportion de fois où le token masqué est dans le top-k des prédictions. Une top-1 accuracy de 0.72 signifie que dans 72% des cas, le modèle prédit exactement le bon mot.
+
+**Application concrète** : Phrase "La [MASK] du X100 dure 2 jours"
+- Token gold : "batterie"
+- Top-1 prédit : "batterie" → top-1 = 1.0
+- Top-5 prédit : ["batterie", "autonomie", "charge", "pile", "alimentation"] → top-5 = 1.0
+- Sur 1000 phrases : top-1 = 0.72, top-5 = 0.89, top-10 = 0.94
+- **Interprétation** : Le modèle a raison dans 72% des cas (top-1). Si on accepte les 5 meilleurs, on monte à 89%.
+
+### Métrique 2 : MRR (Mean Reciprocal Rank) over vocabulary candidates
+**Explication intuitive** : Moyenne des inverses du rang du token correct. Un MRR de 0.78 signifie que le token correct est en moyenne à la position 1/0.78 ≈ 1.28 (donc souvent en 1ère position).
+
+**Application concrète** :
+- Exemple 1 : gold = "batterie", rang=1 → reciprocal rank=1
+- Exemple 2 : gold = "autonomie", rang=2 → reciprocal rank=0.5
+- Exemple 3 : gold = "charge", rang=3 → reciprocal rank=0.33
+- MRR = (1 + 0.5 + 0.33)/3 = 1.83/3 = **0.61**
+- **Interprétation** : MRR est plus sévère que top-1 : il pénalise les rangs élevés.
+
+### Métrique 3 : Pseudo-log-likelihood (PLL)
+**Explication intuitive** : Log-vraisemblance du modèle sur le contexte (pas une métrique de prédiction). Un PLL plus élevé signifie que le modèle est plus "confiant" dans le contexte global.
+
+**Application concrète** :
+- Phrase : "La batterie est excellente"
+- PLL = -2.3 (log probabilité)
+- **Interprétation** : À interpréter séparément du top-k accuracy. Un PLL élevé n'implique pas une bonne prédiction.
+
+#### Visualisation 1 : Top-k predicted token probability bar chart
+**Explication intuitive** : Diagramme à barres des probabilités du top-k.
+
+**Application concrète** :
+- "batterie" : 0.67
+- "autonomie" : 0.18
+- "charge" : 0.07
+- "pile" : 0.04
+- "alimentation" : 0.02
+- **Interprétation** : Distribution très concentrée sur "batterie" (67%). Peu d'ambiguïté.
+
+#### Visualisation 2 : Accuracy breakdown by grammatical category
+**Explication intuitive** : Top-1 accuracy séparée par catégorie grammaticale du token masqué.
+
+**Application concrète** :
+- Noms : 0.81
+- Verbes : 0.68
+- Adjectifs : 0.62
+- Déterminants : 0.95
+- **Interprétation** : Le modèle excelle sur les déterminants (souvent prévisibles), moins sur les adjectifs (plus variables).
+
+#### Visualisation 3 : MRR distribution across the test set
+**Explication intuitive** : Histogramme des MRR individuels (par exemple).
+
+**Application concrète** :
+- Pic à 1.0 (30% des exemples ont rang=1)
+- Queue jusqu'à 0.1 (rang=10)
+- **Interprétation** : 30% des tokens sont parfaitement prédits (rang 1). Le reste a des rangs variables.
+
+---
+
+## 7. RetrievalAnalyser
+
+### Métrique 1 : Precision@k
+**Explication intuitive** : Proportion de documents pertinents parmi les k premiers retrievés. Une Precision@5 de 0.60 signifie que sur les 5 premiers documents, 3 sont pertinents.
+
+**Application concrète** : Query "batterie X100", k=5
+- Documents retrievés : [pertinent, non, pertinent, non, pertinent] → 3 pertinents
+- Precision@5 = 3/5 = **0.60**
+- **Interprétation** : 60% des documents retrievés sont utiles.
+
+### Métrique 2 : Recall@k
+**Explication intuitive** : Proportion des documents pertinents totaux qui sont dans les k premiers retrievés. Un Recall@5 de 0.75 signifie que 75% de tous les documents pertinents sont dans le top-5.
+
+**Application concrète** : Total documents pertinents = 4 (sur 1000)
+- Top-5 contient 3 de ces 4 → Recall@5 = 3/4 = **0.75**
+- **Interprétation** : On trouve 75% des documents pertinents dans les 5 premiers.
+
+### Métrique 3 : NDCG@k (Normalized Discounted Cumulative Gain)
+**Explication intuitive** : Prend en compte le rang et la pertinence graduée (ex: 0=non pertinent, 1=peu, 2=très pertinent). Un NDCG@5 de 0.985 est presque parfait.
+
+**Application concrète** : Pertinence graduée [3, 2, 0, 1, 0] (3=parfait)
+- DCG@5 = 3/log2(2) + 2/log2(3) + 0 + 1/log2(5) = 3 + 1.26 + 0 + 0.43 = 4.69
+- IDCG@5 (ordre idéal) : [3,2,1,0,0] → 3/log2(2)+2/log2(3)+1/log2(4)=3+1.26+0.5=4.76
+- NDCG@5 = 4.69/4.76 = **0.985**
+- **Interprétation** : Le ranking est presque optimal (petite erreur sur le document de pertinence 1).
+
+### Métrique 4 : MRR (Mean Reciprocal Rank)
+**Explication intuitive** : Moyenne de l'inverse du rang du premier document pertinent. Un MRR de 0.90 signifie qu'en moyenne, le premier pertinent est au rang 1/0.90 ≈ 1.11 (souvent en 1ère position).
+
+**Application concrète** :
+- Query 1 : premier pertinent au rang 1 → 1/1=1.0
+- Query 2 : premier pertinent au rang 2 → 1/2=0.5
+- Query 3 : premier pertinent au rang 1 → 1.0
+- MRR = (1.0+0.5+1.0)/3 = 2.5/3 = **0.833**
+- **Interprétation** : Le plus souvent, le premier pertinent est en position 1, parfois en position 2.
+
+### Métrique 5 : MAP (Mean Average Precision)
+**Explication intuitive** : Moyenne des précisions à chaque rang où un document pertinent apparaît. Un MAP de 0.75 signifie une bonne performance.
+
+**Application concrète** : Query avec pertinences [1,0,1,1,0] (3 pertinents)
+- Précision@1 = 1/1=1.0
+- Précision@3 = 2/3=0.67 (2 pertinents sur 3)
+- Précision@4 = 3/4=0.75
+- Average Precision = (1.0+0.67+0.75)/3 = 2.42/3 = 0.81
+- MAP = moyenne sur toutes les queries = **0.75**
+- **Interprétation** : En moyenne, la précision sur les rangs pertinents est de 75%.
+
+#### Visualisation 1 : Precision@k and Recall@k vs. k curves
+**Explication intuitive** : Courbes montrant comment précision et rappel évoluent avec k.
+
+**Application concrète** :
+- P@1=0.9, P@5=0.7, P@10=0.5, P@20=0.3
+- R@1=0.2, R@5=0.6, R@10=0.8, R@20=0.9
+- **Interprétation** : Compromis classique : plus on augmente k, plus la précision baisse et le rappel monte.
+
+#### Visualisation 2 : Rank distribution of first relevant document
+**Explication intuitive** : Histogramme du rang du premier document pertinent.
+
+**Application concrète** :
+- Rang 1 : 60% des queries
+- Rang 2 : 20%
+- Rang 3 : 10%
+- Rang >3 : 10%
+- **Interprétation** : Dans 60% des cas, le meilleur document est en première position. Dans 10% des cas, il est au-delà du rang 3 (problème).
+
+#### Visualisation 3 : Query-level NDCG distribution histogram
+**Explication intuitive** : Histogramme des NDCG individuels par query.
+
+**Application concrète** :
+- Moyenne = 0.85, médiane = 0.88
+- 10% des queries avec NDCG < 0.60 (mauvais ranking)
+- **Interprétation** : La plupart des queries sont bien traitées, mais 10% sont problématiques.
+
+---
+
+## 8. XAITextAnalyser
+
+### 8.1 FeatureImportanceAnalyser
+
+#### Métrique : Top-k feature importance magnitude
+**Explication intuitive** : Classement des features (mots, n-grammes) par leur contribution absolue à la prédiction.
+
+**Application concrète** : Modèle TF-IDF + régression logistique
+- Top features pour classe Positif : "excellente"(+2.1), "super"(+1.8), "parfait"(+1.5)
+- Top features pour classe Négatif : "déçu"(-2.5), "cher"(-2.0), "mauvais"(-1.9)
+- **Interprétation** : "excellente" est très indicatif du positif, "déçu" du négatif.
+
+#### Visualisation : Horizontal bar chart of top-k features per class
+**Explication intuitive** : Diagramme à barres horizontales des features les plus importantes pour chaque classe.
+
+**Application concrète** :
+- Classe Positif : "excellente" (barre longue à droite), "super", "parfait"
+- Classe Négatif : "déçu" (barre longue à gauche), "cher", "mauvais"
+- **Interprétation** : Visualisation immédiate des mots clés pour chaque sentiment.
+
+---
+
+### 8.1.1 LinearFeatureImportanceAnalyser
+
+#### Visualisation : Inline token highlighting
+**Explication intuitive** : Le texte original est affiché avec des couleurs (ex: vert pour positif, rouge pour négatif) indiquant la contribution de chaque token.
+
+**Application concrète** : Commentaire "La batterie est excellente mais trop chère"
+- Prédiction : Négatif (à cause de "chère")
+- Highlighting :
+  - Vert : "excellente" (contribution +2.1)
+  - Rouge : "chère" (contribution -3.4), "trop" (contribution -1.2)
+- **Interprétation** : On voit en un coup d'œil que "chère" annule "excellente". Le modèle est sensible au prix.
+
+---
+
+### 8.1.2 TokenImportanceAnalyser (SHAP, LIME, etc.)
+
+#### Métrique 1 : Faithfulness
+**Explication intuitive** : Corrélation entre les scores d'importance attribués par SHAP et l'effet réel de la suppression du token. Une faithfulness de 0.89 signifie une forte correspondance.
+
+**Application concrète** : Token "excellente"
+- SHAP = +0.52
+- Supprimer le token → proba positive chute de 0.78 à 0.31 (effet réel = 0.47)
+- Corrélation sur tous les tokens = **0.89**
+- **Interprétation** : SHAP explique bien l'importance réelle des tokens.
+
+#### Métrique 2 : Sufficiency
+**Explication intuitive** : Proportion de la prédiction expliquée par un sous-ensemble de tokens importants. Une suffisance de 0.85 signifie que les top tokens suffisent à reproduire 85% de la prédiction.
+
+**Application concrète** : Top-3 tokens ("excellente", "mais", "chère")
+- Prédiction originale : négatif (0.78)
+- Prédiction sur top-3 tokens seulement : négatif (0.66)
+- Sufficiency = 0.66/0.78 = **0.85**
+- **Interprétation** : Les 3 tokens les plus importants capturent 85% du signal.
+
+#### Métrique 3 : Comprehensiveness
+**Explication intuitive** : Perte de confiance quand on supprime les tokens importants. Une comprehensiveness de 0.75 signifie que la confiance chute de 75%.
+
+**Application concrète** : Supprimer les top-3 tokens
+- Prédiction originale : négatif (0.78)
+- Prédiction sans top-3 : neutre (0.45)
+- Perte = 0.78 - 0.45 = 0.33 → comprehensiveness = 0.33/0.78 = **0.42**
+- **Interprétation** : La suppression des tokens importants réduit la confiance de 42% (signal modéré).
+
+#### Visualisation 1 : Token-level importance heatmap
+**Explication intuitive** : Matrice (tokens × classes) avec couleurs indiquant la contribution de chaque token à chaque classe.
+
+**Application concrète** : Commentaire de 15 tokens
+- "excellente" : rouge intense pour Positif (+0.6), bleu pour Négatif (-0.1)
+- "chère" : bleu intense pour Négatif (-0.5), rouge faible pour Positif (+0.05)
+- **Interprétation** : Heatmap montre les tokens qui poussent vers chaque classe.
+
+#### Visualisation 2 : Top-k token attribution bar chart
+**Explication intuitive** : Diagramme à barres des scores d'attribution des tokens les plus importants.
+
+**Application concrète** :
+- "chère" : -0.51
+- "excellente" : +0.48
+- "trop" : -0.32
+- "mais" : -0.15 (changement de direction)
+- **Interprétation** : "chère" a le plus grand poids négatif, suivi de "trop". "excellente" tente de compenser mais échoue.
+
+#### Visualisation 3 : Per-class attribution comparison heatmap
+**Explication intuitive** : Heatmap avec tokens en lignes, classes en colonnes, couleur = importance.
+
+**Application concrète** : 10 tokens × 3 classes
+- Token "excellente" : Positif=0.6, Neutre=0.1, Négatif=-0.1
+- Token "chère" : Positif=-0.1, Neutre=-0.2, Négatif=-0.5
+- **Interprétation** : "excellente" est spécifique au positif, "chère" au négatif.
+
+---
+
+### 8.2 AttentionAnalyser
+
+#### Métrique 1 : Attention–gradient importance correlation (per head)
+**Explication intuitive** : Corrélation entre les poids d'attention et les gradients (importance). Une corrélation élevée signifie que l'attention reflète bien l'importance.
+
+**Application concrète** : Tête d'attention 7, couche 11
+- Corrélation = **0.72** (modérée à élevée)
+- **Interprétation** : Cette tête d'attention est assez fiable pour l'explicabilité.
+
+#### Métrique 2 : Attention entropy per head
+**Explication intuitive** : Mesure de concentration de l'attention. Une entropie faible signifie que la tête se concentre sur peu de tokens.
+
+**Application concrète** :
+- Tête 3 : entropie = 0.45 (très concentrée)
+- Tête 7 : entropie = 1.2 (dispersée)
+- **Interprétation** : La tête 3 se concentre sur quelques tokens (peut-être des mots-clés), la tête 7 regarde partout.
+
+#### Visualisation 1 : Token × token attention heatmap per head and layer
+**Explication intuitive** : Matrice carrée (tokens en X et Y) où chaque cellule représente le poids d'attention de token_i vers token_j.
+
+**Application concrète** : Phrase "Le produit est bien mais la batterie est faible"
+- Couche 11, tête 7 : 
+  - "batterie" attend vers "faible" (poids 0.42)
+  - "bien" attend vers "produit" (poids 0.38)
+- **Interprétation** : La tête capture les relations adjectif-nom.
+
+#### Visualisation 2 : Aggregated multi-head attention heatmap
+**Explication intuitive** : Moyenne des attentions sur toutes les têtes (ou un sous-ensemble).
+
+**Application concrète** : Aggrégation sur 12 têtes
+- Motif général : focus sur les adjectifs évaluatifs
+- **Interprétation** : Les têtes sont d'accord : l'attention se concentre sur les mots qui portent le sentiment.
+
+#### Visualisation 3 : Entropy per head bar chart across layers
+**Explication intuitive** : Diagramme à barres de l'entropie par tête, organisé par couche.
+
+**Application concrète** :
+- Couche 1 : entropies élevées (1.4-1.6) → attention dispersée
+- Couche 6 : entropies plus faibles (0.8-1.2)
+- Couche 12 : entropies encore plus faibles (0.5-0.9)
+- **Interprétation** : Les couches hautes se concentrent sur moins de tokens (spécialisation).
+
+---
+
+### 8.3 CounterfactualTextAnalyser
+
+#### Métrique 1 : Semantic similarity (original vs. counterfactual)
+**Explication intuitive** : Similarité cosinus des embeddings entre le texte original et le contre factuel. Une similarité de 0.85 signifie que le changement est sémantiquement petit.
+
+**Application concrète** : Original "La batterie est correcte" (Neutre)
+- Counterfactual "La batterie est excellente" (Positif)
+- Similarité cosinus = **0.85**
+- **Interprétation** : Le changement est minime ("correcte" → "excellente") mais change la classe.
+
+#### Métrique 2 : Label flip rate
+**Explication intuitive** : Proportion de contre factuels générés qui changent effectivement la prédiction. Un taux de 0.90 signifie que 90% des perturbations proposées inversent la classe.
+
+**Application concrète** : Génération de 100 contre factuels
+- 90 changent la prédiction (Positif→Négatif ou vice-versa)
+- **Label flip rate** = 0.90
+- **Interprétation** : Le modèle est sensible à ces changements. Bonne découverte de frontières de décision.
+
+#### Métrique 3 : Fluency of generated counterfactual (perplexity via LM)
+**Explication intuitive** : Perplexité du contre factuel mesurée par un modèle de langue. Une perplexité basse signifie que le texte est naturel.
+
+**Application concrète** : Phrase originale : "La batterie est correcte"
+- CF : "La batterie est excellente" → perplexité = 25 (naturelle)
+- CF : "La batterie est magnifique" → perplexité = 120 (moins naturelle, car "magnifique" rare pour batterie)
+- **Interprétation** : Le contre factuel doit être fluide pour être utile.
+
+#### Visualisation 1 : Side-by-side original vs. counterfactual diff
+**Explication intuitive** : Affichage côte à côte du texte original et du contre factuel, avec surbrillance des tokens modifiés.
+
+**Application concrète** :
+- Original : "La **batterie** est **correcte**" (Neutre, proba=0.60)
+- CF : "La **batterie** est ~~correcte~~ **excellente**" (Positif, proba=0.85)
+- **Interprétation** : Un seul changement de mot suffit à faire basculer la prédiction. La frontière de décision est proche.
+
+#### Visualisation 2 : Semantic distance distribution across generated counterfactuals
+**Explication intuitive** : Histogramme des distances sémantiques entre originaux et contre factuels.
+
+**Application concrète** :
+- Moyenne = 0.35, écart-type = 0.12
+- La plupart des CF sont à distance 0.25-0.45
+- **Interprétation** : Les contre factuels sont généralement des petites perturbations sémantiques (ce qui est souhaitable).
+
