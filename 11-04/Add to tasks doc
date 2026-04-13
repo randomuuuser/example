@@ -1,0 +1,17 @@
+- `MultiLabelClassificationTask` — specialises
+  `SequenceClassificationTask` for multi-label classification, where
+  multiple labels can be simultaneously active for a single input.
+  *Ex: a support ticket tagged simultaneously as "billing",
+  "technical_issue", and "urgent".*
+  Unlike single-label classification (softmax, scores sum to 1),
+  multi-label classification applies a sigmoid per label — each score
+  is independent and represents the probability of that label being
+  active.
+  - `threshold: float` — decision threshold above which a label is
+    considered active; applied in `predict()` over the scores
+    returned by `predict_proba()`.
+  - `predict(text) List[str]` — overrides parent; returns all labels
+    whose score exceeds `self.threshold`.
+  - `predict_proba(text) Dict[str, float]` — overrides parent;
+    returns independent activation scores per label (sigmoid outputs,
+    not a probability distribution).
