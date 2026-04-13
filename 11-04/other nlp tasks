@@ -14,7 +14,7 @@ financial entity extraction (company names, amounts, dates), legal entity extrac
 ---
 
 **`POSTaggingTask`**
-keyword extraction
+syntactic parsing pipeline
 
 ---
 
@@ -24,17 +24,17 @@ contract clause completion, missing word prediction in documents, form field com
 ---
 
 **`MultiLabelClassificationTask`**
-multi-topic document tagging, multi-intent detection, content moderation, multilabel email classification.
+multi-topic document tagging, multi-intent detection, content moderation, multi-label email classification.
 
 ---
 
 **`ExtractiveQATask`**
-contract clause extraction, FAQ answering
+contract clause extraction, FAQ answer extraction
 
 ---
 
 **`CompletionTask`**
-SQL generation, report writing, email style rewriting (formal → informal).
+SQL generation, report drafting, email style rewriting (formal → informal).
 
 ---
 
@@ -54,7 +54,7 @@ customer support assistant, IT helpdesk assistant.
 ---
 
 **`RagTask`**
-internal knowledge base Q&A, regulatory compliance assistant, advisor support chatbot.
+internal knowledge base Q&A, regulatory compliance assistant, decision-support chatbot.
 
 ---
 
@@ -69,7 +69,7 @@ semantic search engine, document deduplication, recommendation system.
 ---
 
 **`RetrievalTask`**
-internal documentation retrieval, product catalogue search.
+product catalogue search, internal document retrieval.
 
 ---
 
@@ -94,7 +94,7 @@ multilingual conference interpretation, real-time subtitle generation.
 ---
 
 **`TTSTask`**
-virtual assistant voice generation, IVR system voice generation.
+virtual assistant voice generation, IVR voice generation.
 
 
 
