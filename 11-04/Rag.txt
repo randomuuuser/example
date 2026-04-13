@@ -1,0 +1,43 @@
+
+
+
+- `RagTask` — retrieves relevant passages from a knowledge base via
+  a `RetrievalTask` component and generates an answer conditioned
+  on them. *Ex: chatbot answering from internal documentation.*
+  - `retrieval_task: RetrievalTask` — retrieval component responsible
+    for fetching relevant passages; replaces the former opaque
+    `retriever: Any` and `vector_store: Any` attributes.
+  - `generate(query) str` — overrides `NLPGenerativeTask.generate()`;
+    internally calls `self.retrieval_task.retrieve(query)` to fetch
+    relevant passages, then generates an answer conditioned on them.
+
+
+- `RetrievalTask` — retrieves the most relevant passages from an
+  indexed knowledge base given a query.
+  - `embedding_task: EmbeddingTask` — encodes the query into a dense
+    vector for similarity search against the `vector_store`; ensures
+    the same embedding model is used for both indexing and retrieval.
+  - `vector_store: Any` — indexed passage store queried at inference
+    time (e.g. FAISS, Chroma, Elasticsearch).
+  - `top_k: int` — number of passages to retrieve per query.
+  - `retrieve(query) List[str]` — encodes the query via
+    `self.embedding_task`, searches `self.vector_store`, and returns
+    the top-k most relevant passages.
+
+
+ RetrievalTask {
+    +EmbeddingTask embedding_task
+    +Any vector_store
+    +int top_k
+    +retrieve(query) List~str~
+}
+
+
+NLPTask <|-- RetrievalTask
+
+ RagTask {
+    +RetrievalTask retrieval_task
+    +int max_new_tokens
+    +float temperature
+    +generate(query) str
+}
