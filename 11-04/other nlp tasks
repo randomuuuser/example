@@ -1,0 +1,106 @@
+**`SequenceClassificationTask`**
+sentiment analysis, intent detection, toxicity detection.
+
+---
+
+**`NLITask`**
+fact-checking, duplicate question detection.
+
+---
+
+**`NERTask`**
+financial entity extraction (company names, amounts, dates), legal entity extraction (parties, contract terms).
+
+---
+
+**`POSTaggingTask`**
+keyword extraction
+
+---
+
+**`FillMaskTask`**
+contract clause completion, missing word prediction in documents, form field completion
+
+---
+
+**`MultiLabelClassificationTask`**
+multi-topic document tagging, multi-intent detection, content moderation, multilabel email classification.
+
+---
+
+**`ExtractiveQATask`**
+contract clause extraction, FAQ answering
+
+---
+
+**`CompletionTask`**
+SQL generation, report writing, email style rewriting (formal → informal).
+
+---
+
+**`MachineTranslationTask`**
+multilingual document translation, real-time chat translation
+
+---
+
+**`SummarizationTask`**
+report summarisation, meeting notes summarisation.
+
+---
+
+**`DialogueTask`**
+customer support assistant, IT helpdesk assistant.
+
+---
+
+**`RagTask`**
+internal knowledge base Q&A, regulatory compliance assistant, advisor support chatbot.
+
+---
+
+**`AgentTask`**
+IT incident resolution agent, automated research assistant.
+
+---
+
+**`EmbeddingTask`**
+semantic search engine, document deduplication, recommendation system.
+
+---
+
+**`RetrievalTask`**
+internal documentation retrieval, product catalogue search.
+
+---
+
+**`TopicModelingTask`**
+customer feedback theme extraction, support ticket categorisation.
+
+---
+
+**`ClusteringNLPTask`**
+customer verbatim segmentation, FAQ deduplication.
+
+---
+
+**`ASRTask`**
+call center transcription, meeting transcription.
+
+---
+
+**`ASTTask`**
+multilingual conference interpretation, real-time subtitle generation.
+
+---
+
+**`TTSTask`**
+virtual assistant voice generation, IVR system voice generation.
+
+
+
+
+NOTE :
+- `FillMaskTask` all related to domain-specific vocabulary probing
+- `FillMaskTask` + combiner à un classifier pour: bias detection in language models
+- POSTagging pour Analyse d'informations : Elle permet d’extraire des relations précises entre mots, comme dans « L’entreprise A a racheté l’entreprise B », où elle identifie automatiquement le sujet, l’action et l’objet pour construire des faits structurés (ex. : triplets Sujet-Verbe-Objet).
+Utile pour les bases de connaissances et les graphes de connaissances. 
