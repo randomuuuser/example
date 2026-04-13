@@ -1,0 +1,114 @@
+Create a single-file HTML/CSS/JS page that acts as a use case explorer
+for an internal NLP library. No frameworks, no external dependencies
+except a clean Google Font (Inter or similar).
+
+The page has two sections:
+
+LEFT PANEL — Use case selector
+A searchable dropdown (text input + filtered list below) showing all
+use cases sorted from most common to least common. Each use case is
+displayed as a pill/badge with its associated task name subtitle.
+Full list (in order):
+
+- Meeting transcription → ASRTask
+- Sentiment analysis → SequenceClassificationTask
+- Customer support assistant → DialogueTask
+- Internal knowledge base Q&A → RagTask
+- Report summarisation → SummarizationTask
+- SQL generation → CompletionTask
+- Contract clause extraction → ExtractiveQATask
+- Financial entity extraction → NERTask
+- Multilingual document translation → MachineTranslationTask
+- Multi-label email classification → MultiLabelClassificationTask
+- Call center transcription → ASRTask
+- Meeting notes summarisation → SummarizationTask
+- Fact-checking → NLITask
+- Regulatory compliance assistant → RagTask
+- Internal document retrieval → RetrievalTask
+- Customer feedback theme extraction → TopicModelingTask
+- IT helpdesk assistant → DialogueTask
+- Email style rewriting → CompletionTask
+- Customer verbatim segmentation → ClusteringNLPTask
+- FAQ answer extraction → ExtractiveQATask
+- Real-time chat translation → MachineTranslationTask
+- Duplicate question detection → NLITask
+- Virtual assistant voice generation → TTSTask
+- Support ticket categorisation → TopicModelingTask
+- Multi-intent detection → MultiLabelClassificationTask
+- IT incident resolution agent → AgentTask
+- Legal entity extraction → NERTask
+- Intent detection → SequenceClassificationTask
+- Content moderation → MultiLabelClassificationTask
+- Contract clause completion → FillMaskTask
+- Decision-support chatbot → RagTask
+- Automated research assistant → AgentTask
+- Real-time subtitle generation → ASTTask
+- Toxicity detection → SequenceClassificationTask
+- FAQ deduplication → ClusteringNLPTask
+- Multilingual conference interpretation → ASTTask
+- IVR voice generation → TTSTask
+- Syntactic parsing pipeline → POSTaggingTask
+
+RIGHT PANEL — Task detail card
+When a use case is selected, display a clean card showing:
+1. Use case name (large, prominent)
+2. Task to instantiate (highlighted, e.g. ASRTask in a colored badge)
+3. Full class hierarchy as a breadcrumb path, e.g.:
+   NLPTask → AudioTask → ASRTask
+   Use these exact hierarchies:
+   - NLPTask → NLPDiscriminativeTask → SequenceClassificationTask → MultiLabelClassificationTask
+   - NLPTask → NLPDiscriminativeTask → SequenceClassificationTask → NLITask
+   - NLPTask → NLPDiscriminativeTask → SequenceClassificationTask
+   - NLPTask → NLPDiscriminativeTask → TokenClassificationTask → NERTask
+   - NLPTask → NLPDiscriminativeTask → TokenClassificationTask → POSTaggingTask
+   - NLPTask → NLPDiscriminativeTask → FillMaskTask
+   - NLPTask → ExtractiveQATask
+   - NLPTask → NLPGenerativeTask → CompletionTask
+   - NLPTask → NLPGenerativeTask → MachineTranslationTask
+   - NLPTask → NLPGenerativeTask → SummarizationTask
+   - NLPTask → NLPGenerativeTask → DialogueTask
+   - NLPTask → NLPGenerativeTask → RagTask
+   - NLPTask → NLPGenerativeTask → AgentTask
+   - NLPTask → NLPRepresentationTask → EmbeddingTask
+   - NLPTask → RetrievalTask
+   - NLPTask → TopicModelingTask
+   - NLPTask → ClusteringNLPTask
+   - NLPTask → AudioTask → ASRTask
+   - NLPTask → AudioTask → ASTTask
+   - NLPTask → AudioTask → TTSTask
+
+4. A short one-line description of what the task does.
+   Use these descriptions:
+   - SequenceClassificationTask: assigns a single label to an input sequence.
+   - MultiLabelClassificationTask: assigns multiple simultaneous labels to an input sequence.
+   - NLITask: determines whether a hypothesis is entailed, contradicted, or neutral w.r.t. a premise.
+   - NERTask: assigns named entity labels to each token in a sequence.
+   - POSTaggingTask: assigns morphosyntactic tags to each token in a sequence.
+   - FillMaskTask: predicts masked tokens in a sentence using masked language modelling.
+   - ExtractiveQATask: extracts a verbatim answer span from a context passage.
+   - CompletionTask: generates free-form text from a prompt using autoregressive LM.
+   - MachineTranslationTask: translates text from a source language to a target language.
+   - SummarizationTask: condenses a long text into a shorter summary.
+   - DialogueTask: generates the next reply conditioned on a conversation history.
+   - RagTask: retrieves relevant passages and generates a grounded answer.
+   - AgentTask: plans and executes actions in a loop by calling external tools.
+   - EmbeddingTask: encodes text into dense vectors in a semantic space.
+   - RetrievalTask: retrieves the most relevant passages from an indexed knowledge base.
+   - TopicModelingTask: discovers latent topics in a corpus without supervision.
+   - ClusteringNLPTask: groups similar texts into clusters without predefined labels.
+   - ASRTask: transcribes audio into text.
+   - ASTTask: translates spoken audio directly into text in a target language.
+   - TTSTask: synthesises audio from text.
+
+Design requirements:
+- Clean, minimal, professional — suitable for an internal dev tool
+- Color-code the task branches:
+  Discriminative → blue, Generative → green,
+  Representation → purple, Audio → orange,
+  Standalone (ExtractiveQATask, RetrievalTask,
+  TopicModelingTask, ClusteringNLPTask, FillMaskTask) → gray
+- The breadcrumb uses the same branch color
+- No use case selected by default — show a placeholder message in
+  the right panel ("Select a use case to see the associated task")
+- Smooth transition when switching between use cases
+- The search filters the list in real time as the user types
