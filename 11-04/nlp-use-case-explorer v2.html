@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EvalDash - NLP Tasks</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f3f0;
+    --bg-panel: #ffffff;
+    --bg-card: #f9f8f6;
+    --bg-hover: #f0eeeb;
+    --bg-input: #ffffff;
+    --border: #e0dbd4;
+    --border-subtle: #ebe7e2;
+    --text: #1a1a1a;
+    --text-muted: #5c5650;
+    --text-dim: #9a9087;
+
+    --bnp-green: #00915a;
+    --bnp-dark: #1a3c34;
+
+    --blue: #2b6cb0;
+    --blue-bg: rgba(43, 108, 176, 0.07);
+    --blue-border: rgba(43, 108, 176, 0.22);
+    --green: #00915a;
+    --green-bg: rgba(0, 145, 90, 0.07);
+    --green-border: rgba(0, 145, 90, 0.22);
+    --purple: #7c3aed;
+    --purple-bg: rgba(124, 58, 237, 0.07);
+    --purple-border: rgba(124, 58, 237, 0.22);
+    --orange: #c2590a;
+    --orange-bg: rgba(194, 89, 10, 0.07);
+    --orange-border: rgba(194, 89, 10, 0.22);
+    --gray: #6b7280;
+    --gray-bg: rgba(107, 114, 128, 0.07);
+    --gray-border: rgba(107, 114, 128, 0.22);
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    grid-column: 1 / -1;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-panel);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .header-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--bnp-green), var(--bnp-dark));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; color: #fff;
+    letter-spacing: -0.5px;
+  }
+
+  .header h1 {
+    font-size: 16px; font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+
+  .header h1 span {
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-left: 8px;
+    font-size: 13px;
+  }
+
+  /* ── Left panel ── */
+  .left-panel {
+    border-right: 1px solid var(--border);
+    background: var(--bg-panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.03);
+  }
+
+  .search-wrap {
+    padding: 16px 16px 12px;
+    position: relative;
+  }
+
+  .search-wrap svg {
+    position: absolute;
+    left: 28px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 10px 14px 10px 40px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-input);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input::placeholder { color: var(--text-dim); }
+  .search-input:focus { border-color: var(--bnp-green); }
+
+  .list-meta {
+    padding: 0 16px 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .use-case-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 8px 16px;
+  }
+
+  .use-case-list::-webkit-scrollbar { width: 6px; }
+  .use-case-list::-webkit-scrollbar-track { background: transparent; }
+  .use-case-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .uc-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 2px;
+  }
+  .uc-item:hover { background: var(--bg-hover); }
+
+  .uc-color-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .uc-info { flex: 1; min-width: 0; }
+  .uc-name {
+    font-size: 13px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+  .uc-task-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.3;
+  }
+
+  /* ── Right panel ── */
+  .right-panel {
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    overflow-y: auto;
+  }
+
+  .placeholder {
+    text-align: center;
+    color: var(--text-dim);
+    max-width: 320px;
+  }
+  .placeholder-icon {
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    margin-bottom: 16px;
+    font-size: 22px;
+  }
+  .placeholder p {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Detail card ── */
+  .detail-card {
+    width: 100%;
+    max-width: 600px;
+    animation: cardIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .detail-uc-name {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+    margin-bottom: 20px;
+  }
+
+  .detail-task-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 8px;
+    margin-bottom: 28px;
+  }
+  .detail-task-badge::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-dim);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 28px;
+    padding: 14px 16px;
+    background: var(--bg-card);
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle);
+  }
+
+  .bc-node {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 5px;
+    background: var(--bg-panel);
+    white-space: nowrap;
+  }
+  .bc-node.bc-leaf {
+    font-weight: 700;
+  }
+
+  .bc-arrow {
+    margin: 0 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .detail-desc {
+    font-size: 15px;
+    color: var(--text-muted);
+    line-height: 1.7;
+    padding: 16px 18px;
+    background: var(--bg-card);
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle);
+  }
+
+  .detail-desc::first-letter {
+    text-transform: uppercase;
+  }
+
+  /* ── Branch colors on elements ── */
+  .branch-blue .uc-color-dot { background: var(--blue); }
+  .branch-green .uc-color-dot { background: var(--green); }
+  .branch-purple .uc-color-dot { background: var(--purple); }
+  .branch-orange .uc-color-dot { background: var(--orange); }
+  .branch-gray .uc-color-dot { background: var(--gray); }
+
+  .badge-blue { color: var(--blue); background: var(--blue-bg); border: 1px solid var(--blue-border); }
+  .badge-green { color: var(--green); background: var(--green-bg); border: 1px solid var(--green-border); }
+  .badge-purple { color: var(--purple); background: var(--purple-bg); border: 1px solid var(--purple-border); }
+  .badge-orange { color: var(--orange); background: var(--orange-bg); border: 1px solid var(--orange-border); }
+  .badge-gray { color: var(--gray); background: var(--gray-bg); border: 1px solid var(--gray-border); }
+
+  .bc-blue { color: var(--blue); }
+  .bc-green { color: var(--green); }
+  .bc-purple { color: var(--purple); }
+  .bc-orange { color: var(--orange); }
+  .bc-gray { color: var(--gray); }
+
+  .bc-leaf.bc-blue { background: var(--blue-bg); }
+  .bc-leaf.bc-green { background: var(--green-bg); }
+  .bc-leaf.bc-purple { background: var(--purple-bg); }
+  .bc-leaf.bc-orange { background: var(--orange-bg); }
+  .bc-leaf.bc-gray { background: var(--gray-bg); }
+
+  .uc-item.active .uc-name { color: var(--text); font-weight: 600; }
+  .uc-item.active { background: var(--bg-card); border: 1px solid var(--border); }
+
+  .no-results {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="header-icon">🧪</div>
+    <h1>Use Case Explorer <span>EvalDash - NLP Tasks</span></h1>
+  </header>
+
+  <aside class="left-panel">
+    <div class="search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search use cases or tasks…" autocomplete="off">
+    </div>
+    <div class="list-meta" id="listMeta">38 use cases</div>
+    <div class="use-case-list" id="useCaseList"></div>
+  </aside>
+
+  <main class="right-panel" id="rightPanel">
+    <div class="placeholder" id="placeholder">
+      <div class="placeholder-icon">🔍</div>
+      <p>Select a use case to see the associated task and its position in the class hierarchy.</p>
+    </div>
+  </main>
+</div>
+
+<script>
+const USE_CASES = [
+  { name: "Call center transcription", task: "ASRTask" },
+  { name: "Sentiment analysis", task: "SequenceClassificationTask" },
+  { name: "Customer support assistant", task: "DialogueTask" },
+  { name: "Internal knowledge base Q&A", task: "RagTask" },
+  { name: "Report summarisation", task: "SummarizationTask" },
+  { name: "SQL generation", task: "CompletionTask" },
+  { name: "Contract clause extraction", task: "ExtractiveQATask" },
+  { name: "Financial entity extraction", task: "NERTask" },
+  { name: "Multilingual document translation", task: "MachineTranslationTask" },
+  { name: "Multi-label email classification", task: "MultiLabelClassificationTask" },
+  { name: "Meeting transcription", task: "ASRTask" },
+  { name: "Meeting notes summarisation", task: "SummarizationTask" },
+  { name: "Fact-checking", task: "NLITask" },
+  { name: "Regulatory compliance assistant", task: "RagTask" },
+  { name: "Internal document retrieval", task: "RetrievalTask" },
+  { name: "Customer feedback theme extraction", task: "TopicModelingTask" },
+  { name: "IT helpdesk assistant", task: "DialogueTask" },
+  { name: "Email style rewriting", task: "CompletionTask" },
+  { name: "Customer verbatim segmentation", task: "ClusteringNLPTask" },
+  { name: "FAQ answer extraction", task: "ExtractiveQATask" },
+  { name: "Real-time chat translation", task: "MachineTranslationTask" },
+  { name: "Duplicate question detection", task: "NLITask" },
+  { name: "Virtual assistant voice generation", task: "TTSTask" },
+  { name: "Support ticket categorisation", task: "TopicModelingTask" },
+  { name: "Multi-intent detection", task: "MultiLabelClassificationTask" },
+  { name: "IT incident resolution agent", task: "AgentTask" },
+  { name: "Legal entity extraction", task: "NERTask" },
+  { name: "Intent detection", task: "SequenceClassificationTask" },
+  { name: "Content moderation", task: "MultiLabelClassificationTask" },
+  { name: "Contract clause completion", task: "FillMaskTask" },
+  { name: "Decision-support chatbot", task: "RagTask" },
+  { name: "Automated research assistant", task: "AgentTask" },
+  { name: "Real-time subtitle generation", task: "ASTTask" },
+  { name: "Toxicity detection", task: "SequenceClassificationTask" },
+  { name: "FAQ deduplication", task: "ClusteringNLPTask" },
+  { name: "Multilingual conference interpretation", task: "ASTTask" },
+  { name: "IVR voice generation", task: "TTSTask" },
+  { name: "Syntactic parsing pipeline", task: "POSTaggingTask" },
+];
+
+const HIERARCHIES = {
+  MultiLabelClassificationTask: ["NLPTask","NLPDiscriminativeTask","SequenceClassificationTask","MultiLabelClassificationTask"],
+  NLITask: ["NLPTask","NLPDiscriminativeTask","SequenceClassificationTask","NLITask"],
+  SequenceClassificationTask: ["NLPTask","NLPDiscriminativeTask","SequenceClassificationTask"],
+  NERTask: ["NLPTask","NLPDiscriminativeTask","TokenClassificationTask","NERTask"],
+  POSTaggingTask: ["NLPTask","NLPDiscriminativeTask","TokenClassificationTask","POSTaggingTask"],
+  FillMaskTask: ["NLPTask","FillMaskTask"],
+  ExtractiveQATask: ["NLPTask","ExtractiveQATask"],
+  CompletionTask: ["NLPTask","NLPGenerativeTask","CompletionTask"],
+  MachineTranslationTask: ["NLPTask","NLPGenerativeTask","MachineTranslationTask"],
+  SummarizationTask: ["NLPTask","NLPGenerativeTask","SummarizationTask"],
+  DialogueTask: ["NLPTask","NLPGenerativeTask","DialogueTask"],
+  RagTask: ["NLPTask","NLPGenerativeTask","RagTask"],
+  AgentTask: ["NLPTask","NLPGenerativeTask","AgentTask"],
+  EmbeddingTask: ["NLPTask","NLPRepresentationTask","EmbeddingTask"],
+  RetrievalTask: ["NLPTask","RetrievalTask"],
+  TopicModelingTask: ["NLPTask","TopicModelingTask"],
+  ClusteringNLPTask: ["NLPTask","ClusteringNLPTask"],
+  ASRTask: ["NLPTask","AudioTask","ASRTask"],
+  ASTTask: ["NLPTask","AudioTask","ASTTask"],
+  TTSTask: ["NLPTask","AudioTask","TTSTask"],
+};
+
+const DESCRIPTIONS = {
+  SequenceClassificationTask: "Assigns a single label to an input sequence.",
+  MultiLabelClassificationTask: "Assigns multiple simultaneous labels to an input sequence.",
+  NLITask: "Determines whether a hypothesis is entailed, contradicted, or neutral w.r.t. a premise.",
+  NERTask: "Assigns named entity labels to each token in a sequence.",
+  POSTaggingTask: "Assigns morphosyntactic tags to each token in a sequence.",
+  FillMaskTask: "Predicts masked tokens in a sentence using masked language modelling.",
+  ExtractiveQATask: "Extracts a verbatim answer span from a context passage.",
+  CompletionTask: "Generates free-form text from a prompt using autoregressive LM.",
+  MachineTranslationTask: "Translates text from a source language to a target language.",
+  SummarizationTask: "Condenses a long text into a shorter summary.",
+  DialogueTask: "Generates the next reply conditioned on a conversation history.",
+  RagTask: "Retrieves relevant passages and generates a grounded answer.",
+  AgentTask: "Plans and executes actions in a loop by calling external tools.",
+  EmbeddingTask: "Encodes text into dense vectors in a semantic space.",
+  RetrievalTask: "Retrieves the most relevant passages from an indexed knowledge base.",
+  TopicModelingTask: "Discovers latent topics in a corpus without supervision.",
+  ClusteringNLPTask: "Groups similar texts into clusters without predefined labels.",
+  ASRTask: "Transcribes audio into text.",
+  ASTTask: "Translates spoken audio directly into text in a target language.",
+  TTSTask: "Synthesises audio from text.",
+};
+
+function getBranch(task) {
+  const h = HIERARCHIES[task];
+  if (!h) return "gray";
+  if (h.includes("NLPDiscriminativeTask")) return "blue";
+  if (h.includes("NLPGenerativeTask")) return "green";
+  if (h.includes("NLPRepresentationTask")) return "purple";
+  if (h.includes("AudioTask")) return "orange";
+  return "gray";
+}
+
+let activeIndex = -1;
+
+function renderList(filter = "") {
+  const list = document.getElementById("useCaseList");
+  const lc = filter.toLowerCase();
+  const filtered = USE_CASES.map((uc, i) => ({ ...uc, idx: i }))
+    .filter(uc => uc.name.toLowerCase().includes(lc) || uc.task.toLowerCase().includes(lc));
+
+  document.getElementById("listMeta").textContent = `${filtered.length} use case${filtered.length !== 1 ? "s" : ""}`;
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="no-results">No matching use cases</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(uc => {
+    const branch = getBranch(uc.task);
+    const isActive = uc.idx === activeIndex;
+    return `<div class="uc-item branch-${branch}${isActive ? " active" : ""}" data-idx="${uc.idx}">
+      <div class="uc-color-dot"></div>
+      <div class="uc-info">
+        <div class="uc-name">${highlight(uc.name, filter)}</div>
+        <div class="uc-task-label">${highlight(uc.task, filter)}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function highlight(text, query) {
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return text.slice(0, idx) + '<mark style="background:rgba(0,145,90,0.15);color:inherit;border-radius:2px;padding:0 1px">' + text.slice(idx, idx + query.length) + '</mark>' + text.slice(idx + query.length);
+}
+
+function showDetail(uc) {
+  const panel = document.getElementById("rightPanel");
+  const branch = getBranch(uc.task);
+  const hierarchy = HIERARCHIES[uc.task];
+  const desc = DESCRIPTIONS[uc.task];
+
+  const breadcrumbHTML = hierarchy.map((node, i) => {
+    const isLast = i === hierarchy.length - 1;
+    const arrow = i < hierarchy.length - 1 ? '<span class="bc-arrow">→</span>' : "";
+    return `<span class="bc-node${isLast ? " bc-leaf" : ""} bc-${branch}">${node}</span>${arrow}`;
+  }).join("");
+
+  panel.innerHTML = `<div class="detail-card" key="${uc.name}">
+    <div class="detail-uc-name">${uc.name}</div>
+    <div class="detail-task-badge badge-${branch}">${uc.task}</div>
+    <div class="section-label">Class hierarchy</div>
+    <div class="breadcrumb">${breadcrumbHTML}</div>
+    <div class="section-label">Task description</div>
+    <div class="detail-desc">${desc}</div>
+  </div>`;
+}
+
+// Events
+document.getElementById("searchInput").addEventListener("input", e => {
+  renderList(e.target.value);
+});
+
+document.getElementById("useCaseList").addEventListener("click", e => {
+  const item = e.target.closest(".uc-item");
+  if (!item) return;
+  const idx = parseInt(item.dataset.idx);
+  activeIndex = idx;
+  renderList(document.getElementById("searchInput").value);
+  showDetail(USE_CASES[idx]);
+});
+
+// Keyboard nav
+document.getElementById("searchInput").addEventListener("keydown", e => {
+  const items = document.querySelectorAll(".uc-item");
+  if (!items.length) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    const indices = Array.from(items).map(el => parseInt(el.dataset.idx));
+    const currentPos = indices.indexOf(activeIndex);
+    let nextPos;
+    if (e.key === "ArrowDown") nextPos = currentPos < indices.length - 1 ? currentPos + 1 : 0;
+    else nextPos = currentPos > 0 ? currentPos - 1 : indices.length - 1;
+    activeIndex = indices[nextPos];
+    renderList(document.getElementById("searchInput").value);
+    showDetail(USE_CASES[activeIndex]);
+    items[nextPos]?.scrollIntoView({ block: "nearest" });
+  }
+  if (e.key === "Enter" && activeIndex >= 0) {
+    showDetail(USE_CASES[activeIndex]);
+  }
+});
+
+renderList();
+</script>
+</body>
+</html>
