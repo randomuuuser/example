@@ -41,3 +41,50 @@ NLPTask <|-- RetrievalTask
     +float temperature
     +generate(query) str
 }
+
+
+
+
+
+- `RerankingTask` — reorders a list of retrieved passages by
+  relevance to a query using a cross-encoder model. Typically
+  used as a second-stage refinement step after `RetrievalTask`
+  in a RAG pipeline.
+  *Ex: given the query "What are the early redemption conditions?"
+  and 10 retrieved contract passages, reorder them so the most
+  relevant appear first before passing them to `RagTask`.*
+  - `top_k: int` — number of top-ranked passages to return after
+    reranking.
+  - `rerank(query, passages) List[str]` — scores each
+    (query, passage) pair using a cross-encoder and returns the
+    top-k passages sorted by decreasing relevance score.
+
+
+- `RagTask` — retrieves relevant passages from a knowledge base via
+  a `RetrievalTask` component, optionally reranks them via a
+  `RerankingTask` component, and generates an answer conditioned
+  on them.
+  - `retrieval_task: RetrievalTask` — retrieval component responsible
+    for fetching relevant passages.
+  - `reranking_task: Optional[RerankingTask]` — optional reranking
+    component; when provided, reorders retrieved passages by
+    relevance before generation.
+  - `generate(query) str` — overrides `NLPGenerativeTask.generate()`;
+    calls `self.retrieval_task.retrieve(query)`, optionally reranks
+    via `self.reranking_task.rerank()`, then generates an answer
+    conditioned on the final passage list.
+
+
+class RerankingTask {
+    +int top_k
+    +rerank(query, passages) List~str~
+}
+
+NLPTask <|-- RerankingTask
+
+class RagTask {
+    +RetrievalTask retrieval_task
+    +Optional~RerankingTask~ reranking_task
+    +generate(query) str
+}
+
