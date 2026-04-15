@@ -1,0 +1,53 @@
+
+Following the **refactoring NLP tasks** issue, here is a proposal for
+a structured NLP task hierarchy to align task definition, use case
+coverage, and analyser compatibility.
+
+---
+
+**Class diagram**
+
+[insert Mermaid diagram here]
+
+---
+
+**Key design decisions**
+
+**1. One task class, multiple use cases**
+A core principle of this hierarchy is to maximise use case coverage
+per task class, minimising the need to create new task subclasses.
+For instance, `SequenceClassificationTask` alone covers sentiment
+analysis, intent detection, and toxicity detection — three distinct
+use cases instantiated from a single class without requiring dedicated
+subclasses for each. More examples are available in the interactive use case explorer
+included in the eval-dash documentation, which helps developers
+identify which existing task class maps to their use case before
+considering creating a new one.
+
+
+
+This directly addresses the redundancy concern raised in this issue:
+before creating a new task, developers should first check whether an
+existing class can be instantiated to cover their use case.
+
+**2. Analyser compatibility as a hard constraint on task granularity**
+While we want to maximise reuse, over-generalising task classes
+introduces a different risk: two tasks with fundamentally different
+output types cannot share the same analyser without compatibility
+issues. A `SequenceClassificationTask` (output: a scalar label) and
+an `ASRTask` (output: a transcript) require completely different
+evaluation logic — merging them into a broader class would break
+analyser specificity. Task boundaries are therefore drawn at output
+type boundaries, ensuring that analysers attached to a given task
+class remain applicable to all its subclasses without inconsistency.
+
+**3. Inheritance and abstraction for analyser assignment**
+The hierarchy is designed so that common analysers are assigned once
+at the parent class level and automatically inherited by all
+subclasses, avoiding repetition across subclasses. For example, an
+analyser that plots a per-label F1 bar chart is defined once at
+`NLPDiscriminativeTask` level — it is then automatically available
+for `SequenceClassificationTask`, `TokenClassificationTask`, `NERTask`,
+`POSTaggingTask`, and any future discriminative task, without
+redefining it at each subclass level.
+
