@@ -1,0 +1,11 @@
+Hello everyone,
+
+Thank you all for your feedback.
+
+To respond to Pierre and Andrey:
+
+- I fully agree with both of you on the importance of considering analysers at the same time as tasks — this is actually something I have already taken into account on my side. I did not mention it earlier because it was specified that this first meeting was intended as a brainstorming session focused on tasks, and that it was still a bit early to discuss analysers.
+
+- Regarding the input data, this is already partially reflected in the class hierarchy. For example, "SequenceClassificationTask" takes a list of texts as input, whereas "TokenClassificationTask" takes a list of tokens as input. This can of course be made explicit through class attributes if needed.
+
+- Yes, the output type is a key element in the hierarchy I proposed. As mentioned in point 2, tasks such as "SequenceClassificationTask" (label output) and "MachineTranslationTask" (text output) require different evaluation logic, which motivates separating them at the class level.
