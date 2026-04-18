@@ -27,14 +27,11 @@ predicted probability distribution per class
 
 Specialises `SequenceClassificationAnalyser` for multi-label
 classification, where multiple labels can be simultaneously active.
-> Note: `accuracy` inherited from `ClassificationAnalyser` measures
-exact set match; a sample is correct only if all predicted labels
-exactly match the ground truth set, making it a strict metric in
-this context.
 
 **Compatible tasks**: `MultiLabelClassificationTask`
-**Metrics**: subset accuracy, Hamming loss
-(fraction of incorrectly predicted labels per sample)
+**Metrics**: Hamming loss (fraction of incorrectly predicted labels per sample), partial match accuracy
+(proportion of correctly predicted labels over total unique labels,
+as a soft alternative to exact set accuracy)
 **Visualizations**: label co-occurrence heatmap (predicted vs. gold)
 **Visualizations (optional - requires `y_pred_proba`)**:
 F1 vs. threshold curve per label
@@ -45,10 +42,8 @@ F1 vs. threshold curve per label
 Evaluates token-by-token label assignment under a tagging scheme.
 
 **Compatible tasks**: `TokenClassificationTask`
-**Metrics**: token-level accuracy, per-label F1
 **Metrics (optional - requires training vocabulary)**: OOV token accuracy
-**Visualizations**: per-tag confusion matrix,
-tag frequency distribution,
+**Visualizations**: tag frequency distribution,
 accuracy vs. sentence length curve
 **Visualizations (optional - requires training vocabulary)**:
 OOV vs. in-vocabulary accuracy comparison
@@ -76,7 +71,6 @@ end token, and entity type all match the ground truth.
 strict vs. partial matching F1
 **Metrics (optional - requires span offset annotations)**:
 boundary error rate (start/end offset errors)
-**Visualizations**: per-entity-type F1 bar chart
 **Visualizations (optional - requires span offset annotations)**:
 boundary error breakdown (missing entity, spurious entity,
 boundary shift)
