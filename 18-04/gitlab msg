@@ -4,17 +4,18 @@ Here is an updated proposal for the NLP
 task class hierarchy.
 
 **Diagram & documentation**
-- Updated class diagram: see attached image + Mermaid source below 
-- Full attribute/method documentation: see [link_doc]
+- Updated class diagram: **see** attached image + Mermaid source below 
+- Full attribute/method documentation: **see** [link_doc]
+- To give you an idea of how some analysers could be structured (classification family as a first example): **see** [link_analysers]
 
 **Additional notes**
 - General rule: every task in the diagram has its own dedicated
-  analyser in addition to inheriting its parent's analysers — tasks
+  analyser in addition to inheriting its parent's analysers; tasks
   that do not introduce specific evaluation requirements beyond their
   parent have been merged into it. For instance, dedicated subclasses
   like `NERTask` and `POSTaggingTask` are justified by analyser
   compatibility; merging them into their parent would break the
-  evaluation contract of sibling tasks — see [link_analysers].
+  evaluation contract of sibling tasks (**see** [link_analysers]).
 - Some attributes are intentionally repeated between parent and child
   to standardise method overriding; same name, refined type in the
   subclass.
