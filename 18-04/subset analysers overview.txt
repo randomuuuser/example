@@ -29,7 +29,7 @@ Specialises `SequenceClassificationAnalyser` for multi-label
 classification, where multiple labels can be simultaneously active.
 
 **Compatible tasks**: `MultiLabelClassificationTask`
-**Metrics**: Jaccard similarity score, Hamming loss (fraction of incorrectly predicted labels per sample)
+**Metrics**: Hamming loss (fraction of incorrectly predicted labels per sample), Jaccard similarity score
 
 **Visualizations**: label co-occurrence heatmap (predicted vs. true)
 **Visualizations (optional - requires `y_pred_proba`)**:
