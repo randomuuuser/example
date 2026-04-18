@@ -16,24 +16,41 @@ Evaluates classification of an entire input sequence over a label set.
 
 **Compatible tasks**: `SequenceClassificationTask`, `NLITask`
 **Metrics**: label frequency bias (predicted vs. gold distribution shift)
-**Metrics (optional — requires `y_pred_proba`)**: ROC-AUC per class,
-Expected Calibration Error (ECE)
+**Metrics (optional - requires `y_pred_proba`)**: ROC-AUC per class
 **Visualizations**: predicted vs. gold label distribution bar chart
-**Visualizations (optional — requires `y_pred_proba`)**:
-predicted probability distribution per class,
-reliability diagram (calibration curve)
+**Visualizations (optional - requires `y_pred_proba`)**:
+predicted probability distribution per class
+
+---
+
+### 1.1.1 MultiLabelClassificationAnalyser
+
+Specialises `SequenceClassificationAnalyser` for multi-label
+classification, where multiple labels can be simultaneously active.
+> Note: `accuracy` inherited from `ClassificationAnalyser` measures
+exact set match; a sample is correct only if all predicted labels
+exactly match the ground truth set, making it a strict metric in
+this context.
+
+**Compatible tasks**: `MultiLabelClassificationTask`
+**Metrics**: subset accuracy, Hamming loss
+(fraction of incorrectly predicted labels per sample)
+**Visualizations**: label co-occurrence heatmap (predicted vs. gold)
+**Visualizations (optional - requires `y_pred_proba`)**:
+F1 vs. threshold curve per label
 
 ---
 
 ### 1.2 TokenClassificationAnalyser
+Evaluates token-by-token label assignment under a tagging scheme.
 
 **Compatible tasks**: `TokenClassificationTask`
 **Metrics**: token-level accuracy, per-label F1
-**Metrics (optional — requires training vocabulary)**: OOV token accuracy
+**Metrics (optional - requires training vocabulary)**: OOV token accuracy
 **Visualizations**: per-tag confusion matrix,
 tag frequency distribution,
 accuracy vs. sentence length curve
-**Visualizations (optional — requires training vocabulary)**:
+**Visualizations (optional - requires training vocabulary)**:
 OOV vs. in-vocabulary accuracy comparison
 
 > `NERAnalyser` and `POSTaggingAnalyser` are kept as dedicated
@@ -43,7 +60,7 @@ OOV vs. in-vocabulary accuracy comparison
 > matching (a prediction is only correct if start, end, and entity type
 > all match), while POS tagging requires ambiguity-aware evaluation
 > (distinguishing performance on lexically ambiguous words from
-> unambiguous ones) — neither concept is meaningful at the generic
+> unambiguous ones); neither concept is meaningful at the generic
 > token classification level.
 
 ---
@@ -57,10 +74,10 @@ end token, and entity type all match the ground truth.
 **Compatible tasks**: `NERTask`
 **Metrics**: span-level precision/recall/F1 per entity type,
 strict vs. partial matching F1
-**Metrics (optional — requires span offset annotations)**:
+**Metrics (optional - requires span offset annotations)**:
 boundary error rate (start/end offset errors)
 **Visualizations**: per-entity-type F1 bar chart
-**Visualizations (optional — requires span offset annotations)**:
+**Visualizations (optional - requires span offset annotations)**:
 boundary error breakdown (missing entity, spurious entity,
 boundary shift)
 
@@ -72,8 +89,8 @@ Specialises `TokenClassificationAnalyser` for morphosyntactic tagging,
 with focus on lexical ambiguity.
 
 **Compatible tasks**: `POSTaggingTask`
-**Metrics (optional — requires a lexical ambiguity dictionary)**:
+**Metrics (optional - requires a lexical ambiguity dictionary)**:
 ambiguous word accuracy
 (words with multiple valid POS tags depending on context)
-**Visualizations (optional — requires a lexical ambiguity dictionary)**:
+**Visualizations (optional - requires a lexical ambiguity dictionary)**:
 ambiguous vs. unambiguous word accuracy comparison
