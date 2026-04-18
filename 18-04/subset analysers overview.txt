@@ -14,8 +14,8 @@ classification report (precision/recall/F1 per label)
 
 Evaluates classification of an entire input sequence over a label set.
 
-**Compatible tasks**: `SequenceClassificationTask`, `NLITask`
-**Metrics**: label frequency bias (predicted vs. true distribution shift)
+**Compatible tasks**: `SequenceClassificationTask`
+**Metrics**: label distribution shift (predicted vs. true distribution shift)
 **Metrics (optional - requires `y_pred_proba`)**: ROC-AUC per class
 **Visualizations**: predicted vs. true label distribution bar chart
 **Visualizations (optional - requires `y_pred_proba`)**:
@@ -29,9 +29,8 @@ Specialises `SequenceClassificationAnalyser` for multi-label
 classification, where multiple labels can be simultaneously active.
 
 **Compatible tasks**: `MultiLabelClassificationTask`
-**Metrics**: Hamming loss (fraction of incorrectly predicted labels per sample), partial match accuracy
-(proportion of correctly predicted labels over total unique labels,
-as a soft alternative to exact set accuracy)
+**Metrics**: Jaccard similarity score, Hamming loss (fraction of incorrectly predicted labels per sample)
+
 **Visualizations**: label co-occurrence heatmap (predicted vs. true)
 **Visualizations (optional - requires `y_pred_proba`)**:
 F1 vs. threshold curve per label
@@ -84,4 +83,4 @@ with focus on lexical ambiguity.
 
 **Compatible tasks**: `POSTaggingTask`
 **Metrics (optional - requires a lexical ambiguity dictionary)**:
-ambiguous word accuracy (accuracy restricted to words words with multiple valid POS tags depending on context e.g., "fly" as NOUN/VERB))
+ambiguous word accuracy (accuracy restricted to words with multiple valid POS tags depending on context e.g., "fly" as NOUN/VERB))
