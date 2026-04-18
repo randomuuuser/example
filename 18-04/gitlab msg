@@ -1,0 +1,32 @@
+Hello,
+
+Here is an updated proposal for the NLP
+task class hierarchy.
+
+**Diagram & documentation**
+- Updated class diagram: see attached image + Mermaid source below 
+- Full attribute/method documentation: see [link_doc]
+
+**Additional notes**
+- General rule: every task in the diagram has its own dedicated
+  analyser in addition to inheriting its parent's analysers — tasks
+  that do not introduce specific evaluation requirements beyond their
+  parent have been merged into it. For instance, dedicated subclasses
+  like `NERTask` and `POSTaggingTask` are justified by analyser
+  compatibility; merging them into their parent would break the
+  evaluation contract of sibling tasks — see [link_analysers].
+- Some attributes are intentionally repeated between parent and child
+  to standardise method overriding; same name, refined type in the
+  subclass.
+- Some parameters (e.g. `prompt`) are kept to enable richer
+  evaluation such as LLM-judge faithfulness assessment.
+- Getters and other methods can be added as needed.
+- Additional audio tasks, vision-language
+  tasks can be proposed.
+
+**Open questions**
+- Some tasks may have a low probability of real BNP use cases
+  (`FillMaskTask`, `POSTaggingTask` are candidates for removal if
+  no concrete use case justifies them).
+- LLM judge: should it live inside a task or as a standalone analyser
+  compatible with multiple tasks simultaneously?
