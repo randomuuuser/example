@@ -1,0 +1,79 @@
+## 1. ClassificationAnalyser
+
+**Objective**: evaluate any task that assigns discrete labels to an input.
+**Scope**: abstract parent for all classification families (sequence and
+token); defines the shared evaluation contract inherited by all children.
+**Compatible tasks**: `SequenceClassificationTask`, `TokenClassificationTask`
+**Metrics**: accuracy, macro/micro F1, per-label precision/recall
+**Visualizations**: normalised confusion matrix, per-label F1 bar chart,
+classification report (precision/recall/F1 per label)
+
+---
+
+### 1.1 SequenceClassificationAnalyser
+
+Evaluates classification of an entire input sequence over a label set.
+
+**Compatible tasks**: `SequenceClassificationTask`, `NLITask`
+**Metrics**: label frequency bias (predicted vs. gold distribution shift)
+**Metrics (optional — requires `y_pred_proba`)**: ROC-AUC per class,
+Expected Calibration Error (ECE)
+**Visualizations**: predicted vs. gold label distribution bar chart
+**Visualizations (optional — requires `y_pred_proba`)**:
+predicted probability distribution per class,
+reliability diagram (calibration curve)
+
+---
+
+### 1.2 TokenClassificationAnalyser
+
+**Compatible tasks**: `TokenClassificationTask`
+**Metrics**: token-level accuracy, per-label F1
+**Metrics (optional — requires training vocabulary)**: OOV token accuracy
+**Visualizations**: per-tag confusion matrix,
+tag frequency distribution,
+accuracy vs. sentence length curve
+**Visualizations (optional — requires training vocabulary)**:
+OOV vs. in-vocabulary accuracy comparison
+
+> `NERAnalyser` and `POSTaggingAnalyser` are kept as dedicated
+> children rather than merged into `TokenClassificationAnalyser`
+> because they introduce evaluation paradigms that are incompatible
+> with the token-level contract of the parent: NER requires span-level
+> matching (a prediction is only correct if start, end, and entity type
+> all match), while POS tagging requires ambiguity-aware evaluation
+> (distinguishing performance on lexically ambiguous words from
+> unambiguous ones) — neither concept is meaningful at the generic
+> token classification level.
+
+---
+
+#### 1.2.1 NERAnalyser
+
+Specialises `TokenClassificationAnalyser` for span-level named entity
+evaluation. A prediction is correct only if the exact start token,
+end token, and entity type all match the ground truth.
+
+**Compatible tasks**: `NERTask`
+**Metrics**: span-level precision/recall/F1 per entity type,
+strict vs. partial matching F1
+**Metrics (optional — requires span offset annotations)**:
+boundary error rate (start/end offset errors)
+**Visualizations**: per-entity-type F1 bar chart
+**Visualizations (optional — requires span offset annotations)**:
+boundary error breakdown (missing entity, spurious entity,
+boundary shift)
+
+---
+
+#### 1.2.2 POSTaggingAnalyser
+
+Specialises `TokenClassificationAnalyser` for morphosyntactic tagging,
+with focus on lexical ambiguity.
+
+**Compatible tasks**: `POSTaggingTask`
+**Metrics (optional — requires a lexical ambiguity dictionary)**:
+ambiguous word accuracy
+(words with multiple valid POS tags depending on context)
+**Visualizations (optional — requires a lexical ambiguity dictionary)**:
+ambiguous vs. unambiguous word accuracy comparison
