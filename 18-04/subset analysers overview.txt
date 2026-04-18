@@ -84,7 +84,7 @@ with focus on lexical ambiguity.
 
 **Compatible tasks**: `POSTaggingTask`
 **Metrics (optional - requires a lexical ambiguity dictionary)**:
-ambiguous word accuracy
-(words with multiple valid POS tags depending on context)
+ambiguous word accuracy (accuracy restricted to words words with multiple valid POS tags depending on context e.g., "fly" as NOUN/VERB))
+
 **Visualizations (optional - requires a lexical ambiguity dictionary)**:
 ambiguous vs. unambiguous word accuracy comparison
